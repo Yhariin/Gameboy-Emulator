@@ -4,8 +4,6 @@
 #include <math.h>
 #include <stdint.h>
 #include <string.h>
-#include <uchar.h>
-#include <stdbool.h>
 
 #define BYTES(n) (n)
 #define KILOBYTES(n) (n << 10)
@@ -26,11 +24,10 @@ typedef int64_t  i64;
 typedef bool     b8;
 typedef float    f32;
 typedef double   f64;
-typedef char     c8;
+typedef char8_t  c8;
 typedef char16_t c16;
 typedef char32_t c32;
 
-static_assert(sizeof(char) == BYTES(1));
 static_assert(sizeof(bool) == BYTES(1));
 static_assert(sizeof(float) == BYTES(4));
 static_assert(sizeof(double) == BYTES(8));
@@ -180,3 +177,66 @@ static const u64 bitmask61 = 0x1fffffffffffffffull;
 static const u64 bitmask62 = 0x3fffffffffffffffull;
 static const u64 bitmask63 = 0x7fffffffffffffffull;
 static const u64 bitmask64 = 0xffffffffffffffffull;
+
+// Helper functions
+template<typename Type>
+static void swap_val(Type *a, Type *b)
+{
+    Type temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
+template<typename Type>
+static void swap_ref(Type *a, Type *b)
+{
+    Type *temp = a;
+    a = b;
+    b = temp;
+}
+
+template<typename Type>
+static Type min(Type a, Type b)
+{
+    return a<b ? a : b;
+}
+
+template<typename Type>
+static Type max(Type a, Type b)
+{
+    return a>b ? a : b;
+}
+template<typename Type>
+static Type clamp_top(Type val, Type top)
+{
+    return min(val, top);
+}
+
+template<typename Type>
+static Type clamp_bot(Type val, Type bot)
+{
+    return max(val, bot);
+}
+
+template<typename Type>
+static Type clamp(Type val, Type bot, Type top)
+{
+    return clamp_top(clamp_bot(val, bot), top);
+}
+
+u64 align_up_pow2(u64 size, u64 align);
+u64 align_up(u64 size, u64 align);
+u64 align_down_pow2(u64 size, u64 align);
+u64 align_down(u64 size, u64 align);
+
+#define DLL_EXPORT __declspec(dllexport)
+#define DLL_IMPORT __declspec(dllimport)
+
+// Declarations of exported functions from core clash with application's imported function namespace.
+// With this we'll omit the declarations of exported function only when the application is being compiled.
+// Important: Mark any functions meant to be exported from core to application with CORE_EXPORT()
+#ifdef APPLICATION
+    #define CORE_EXPORT(func)
+#else
+    #define CORE_EXPORT(func) func
+#endif
