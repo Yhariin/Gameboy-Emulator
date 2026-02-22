@@ -44,7 +44,7 @@ Arena *arena_init(u64 reserve_size, u64 commit_size)
     return arena;
 }
 
-void *arena_alloc_align(Arena *arena, u64 size)
+void *arena_alloc(Arena *arena, u64 size)
 {
     return arena_alloc_align(arena, size, size);
 }

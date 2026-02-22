@@ -1,149 +1,207 @@
-static void cpu_init()
+static void cpu_init(Arena *arena, u8* rom_data, u64 rom_size)
 {
+    cpu_state = (CPU_State *)arena_alloc_align(arena, sizeof(CPU_State), sizeof(CPU_State));
+    cpu_state->memory = (u8 *)arena_alloc_align(arena, 0xFFFF, sizeof(u8));
+
+    ASSERT(rom_size <= 0x8000, "ERROR Rom size must be at most 32kb!");
+    memcpy(cpu_state->memory, rom_data, rom_size);
 
 }
 
-static void cpu_process(u8* data, u64 data_size)
+static void cpu_process()
 {
 
-    for(u32 i = 0, byte_increment; i < data_size; i += byte_increment)
+    while(cpu_state->pc < 0x8000)
     {
-        byte_increment = 0;
-
-        switch(data[i])
+        switch(cpu_state->memory[cpu_state->pc])
         {
             // NOP
             case 0x00:
             {
-                byte_increment = 1;
+                cpu_state->pc += 1;
                 break;
             }
             // LD BC, imm16
             case 0x01:
             {
-                u16 lo = (u16)(data[i+1]); // low
-                u16 hi = (u16)(data[i+2]) << 8; // hi
+                u16 lo = (u16)(cpu_state->memory[cpu_state->pc+1]); // low
+                u16 hi = (u16)(cpu_state->memory[cpu_state->pc+2]) << 8; // hi
                 set_BC(lo | hi);
-                byte_increment = 3;
+                cpu_state->pc += 3;
                 break;
             }
             // TODO: LD [BC], A
             case 0x02:
             {
-                byte_increment = 1;
+                cpu_state->pc += 1;
                 break;
             }
             // INC BC
             case 0x03:
             {
                 set_BC(get_BC() + 1);
-                byte_increment = 1;
+                cpu_state->pc += 1;
                 break;
             }
             // INC B
             case 0x04:
             {
-                registers.b += 1;
-                byte_increment = 1;
+                cpu_state->registers.b += 1;
+                cpu_state->pc += 1;
                 break;
             }
             // DEC B
             case 0x05:
             {
-                registers.b -= 1;
-                byte_increment = 1;
+                cpu_state->registers.b -= 1;
+                cpu_state->pc += 1;
                 break;
             }
             // LD B, imm8
             case 0x06:
             {
-                registers.b = data[i+1];
-                byte_increment = 2;
+                cpu_state->registers.b = cpu_state->memory[cpu_state->pc+1];
+                cpu_state->pc += 2;
                 break;
             }
             // TODO: RLCA
             case 0x07:
             {
-                byte_increment = 1;
+                cpu_state->pc += 1;
                 break;
             }
             // LD A, imm8
             case 0x3E:
             {
-                registers.a = data[i+1];
-                byte_increment = 2;
+                cpu_state->registers.a = cpu_state->memory[cpu_state->pc+1];
+                cpu_state->pc += 2;
                 break;
             }
             // ADD A, B
             case 0x80:
             {
-                registers.a += registers.b;
-                byte_increment = 1;
+                cpu_state->registers.a += cpu_state->registers.b;
+                cpu_state->pc += 1;
                 break;
             }
             default:
+                cpu_state->pc += 1;
                 break;
         }
+
     }
 
+}
+
+static b8 f_register_get_z()
+{
+    return cpu_state->registers.f & bit7 == bit7;
+}
+
+static b8 f_register_get_n()
+{
+    return cpu_state->registers.f & bit6 == bit6;
+}
+
+static b8 f_register_get_h()
+{
+    return cpu_state->registers.f & bit5 == bit5;
+}
+
+static b8 f_register_get_c()
+{
+    return cpu_state->registers.f & bit4 == bit4;
+}
+
+static void f_register_set_z(b8 flag)
+{
+    if (flag)
+    {
+        cpu_state->registers.f | bit7;
+    }
+    else
+    {
+        cpu_state->registers.f | (~bit7);
+    }
+}
+
+static void f_register_set_n(b8 flag)
+{
+    if (flag)
+    {
+        cpu_state->registers.f | bit6;
+    }
+    else
+    {
+        cpu_state->registers.f | (~bit6);
+    }
+
+}
+
+static void f_register_set_h(b8 flag)
+{
+    if (flag)
+    {
+        cpu_state->registers.f | bit5;
+    }
+    else
+    {
+        cpu_state->registers.f | (~bit5);
+    }
+}
+
+static void f_register_set_c(b8 flag)
+{
+    if (flag)
+    {
+        cpu_state->registers.f | bit4;
+    }
+    else
+    {
+        cpu_state->registers.f | (~bit4);
+    }
 }
 
 static u16 get_AF()
 {
-    return ((u16)registers.a << 8) | registers.f;
+    return ((u16)cpu_state->registers.a << 8) | cpu_state->registers.f;
 }
 
 static void set_AF(u16 value)
 {
-    registers.a = (u8)((value & 0xFF00) >> 8);
-    registers.b = (u8)(value & 0xFF);
+    cpu_state->registers.a = (u8)((value & 0xFF00) >> 8);
+    cpu_state->registers.b = (u8)(value & 0xFF);
 }
 
 static u16 get_BC()
 {
-    return ((u16)registers.b << 8) | registers.c;
+    return ((u16)cpu_state->registers.b << 8) | cpu_state->registers.c;
 }
 
 static void set_BC(u16 value)
 {
-    registers.b = (u8)((value & 0xFF00) >> 8);
-    registers.c = (u8)(value & 0xFF);
+    cpu_state->registers.b = (u8)((value & 0xFF00) >> 8);
+    cpu_state->registers.c = (u8)(value & 0xFF);
 }
 
 static u16 get_DE()
 {
-    return ((u16)registers.d << 8) | registers.e;
+    return ((u16)cpu_state->registers.d << 8) | cpu_state->registers.e;
 }
 
 static void set_DE(u16 value)
 {
-    registers.d = (u8)((value & 0xFF00) >> 8);
-    registers.e = (u8)(value & 0xFF);
+    cpu_state->registers.d = (u8)((value & 0xFF00) >> 8);
+    cpu_state->registers.e = (u8)(value & 0xFF);
 }
 
 static u16 get_HL()
 {
-    return ((u16)registers.h << 8) | registers.l;
+    return ((u16)cpu_state->registers.h << 8) | cpu_state->registers.l;
 }
 
 static void set_HL(u16 value)
 {
-    registers.h = (u8)((value & 0xFF00) >> 8);
-    registers.l = (u8)(value & 0xFF);
-}
-
-static void execute(Instructions instruction)
-{
-    switch (instruction)
-    {
-    case Instructions_ADD:
-    {
-
-        break;
-    }
-
-    default:
-        break;
-    }
-
+    cpu_state->registers.h = (u8)((value & 0xFF00) >> 8);
+    cpu_state->registers.l = (u8)(value & 0xFF);
 }

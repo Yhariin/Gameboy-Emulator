@@ -427,6 +427,7 @@ void os_export_core_library(OS_DLL library)
     f.temp_arena_begin = temp_arena_begin;
     f.get_scratch_arena = get_scratch_arena;
     f.temp_arena_end = temp_arena_end;
+    f.arena_alloc_align = arena_alloc_align;
     f.os_window_close = os_window_close;
     f.os_event_to_string = os_event_to_string;
 
@@ -529,7 +530,7 @@ OS_WindowID os_window_open(const Rect rect, const OS_WindowFlags flags, String t
     SetFocus(hwnd);
     temp_arena_end(temp_arena);
 
-    OS_W32_Window *window = (OS_W32_Window *)arena_alloc_align(global_os_w32_state().arena, sizeof(OS_W32_Window));
+    OS_W32_Window *window = (OS_W32_Window *)arena_alloc(global_os_w32_state().arena, sizeof(OS_W32_Window));
     window->id = os_generate_window_id();
     window->hwnd = hwnd;
 
@@ -542,12 +543,12 @@ OS_WindowID os_window_open(const Rect rect, const OS_WindowFlags flags, String t
 
     linked_list_push_back(global_os_w32_state().first_window, global_os_w32_state().last_window, window);
 
-    OS_Window *window_state = (OS_Window *)arena_alloc_align(global_os_w32_state().arena, sizeof(OS_Window));
+    OS_Window *window_state = (OS_Window *)arena_alloc(global_os_w32_state().arena, sizeof(OS_Window));
     window_state->id = window->id;
     window_state->write_index = 1;
     window_state->read_index = 0;
     window_state->event_queue[0].count = window_state->event_queue[1].count = 0;
-    window_state->mutex = (OS_Mutex *)arena_alloc_align(global_os_w32_state().arena, sizeof(OS_Mutex));
+    window_state->mutex = (OS_Mutex *)arena_alloc(global_os_w32_state().arena, sizeof(OS_Mutex));
     os_mutex_init(window_state->mutex);
     linked_list_push_back(global_os_state().first_window, global_os_state().last_window, window_state);
 
@@ -1024,7 +1025,7 @@ int main(int argc, char **argv)
 
 
     ApplicationState application_state = {};
-    application_state.arena = arena_init(MEGABYTES(1), KILOBYTES(64));
+    application_state.arena = arena_init(MEGABYTES(1), KILOBYTES(128));
 
 
     // Main loop

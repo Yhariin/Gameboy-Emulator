@@ -8,6 +8,7 @@ typedef void f_debug_log(LogColor log_color, const char *format, ...);
 typedef TempArena f_temp_arena_begin(Arena *arena);
 typedef Arena *f_get_scratch_arena();
 typedef void f_temp_arena_end(TempArena temp);
+typedef void *f_arena_alloc_align(Arena *arena, u64 size, u64 alignment);
 typedef void f_os_window_close(OS_WindowID window_id);
 typedef String f_os_event_to_string(Arena *arena, const OS_Event *const event);
 
@@ -23,6 +24,7 @@ struct LibraryFunctions
     f_temp_arena_begin *temp_arena_begin;
     f_get_scratch_arena *get_scratch_arena;
     f_temp_arena_end *temp_arena_end;
+    f_arena_alloc_align *arena_alloc_align;
     f_os_window_close *os_window_close;
     f_os_event_to_string *os_event_to_string;
 
