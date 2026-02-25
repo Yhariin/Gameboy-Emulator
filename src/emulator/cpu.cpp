@@ -2,6 +2,7 @@ static void cpu_init(Arena *arena, u8* rom_data, u64 rom_size)
 {
     cpu_state = (CPU_State *)arena_alloc_align(arena, sizeof(CPU_State), sizeof(CPU_State));
     cpu_state->memory = (u8 *)arena_alloc_align(arena, 0xFFFF, sizeof(u8));
+    cpu_state->sp = 0xFFFF;
 
     ASSERT(rom_size <= 0x8000, "ERROR Rom size must be at most 32kb!");
     memcpy(cpu_state->memory, rom_data, rom_size);
@@ -30,9 +31,10 @@ static void cpu_process()
                 cpu_state->pc += 3;
                 break;
             }
-            // TODO: LD [BC], A
+            // LD [BC], A
             case 0x02:
             {
+                cpu_state->memory[get_BC()] = cpu_state->registers.a;
                 cpu_state->pc += 1;
                 break;
             }
@@ -64,10 +66,32 @@ static void cpu_process()
                 cpu_state->pc += 2;
                 break;
             }
-            // TODO: RLCA
+            // RLCA
             case 0x07:
             {
+                f_register_set_c(bit8 & cpu_state->registers.a);
+                cpu_state->registers.a = cpu_state->registers.a << 1 | f_register_get_c();
+
                 cpu_state->pc += 1;
+                break;
+            }
+            // LD [imm16], sp
+            case 0x08:
+            {
+                u16 hi = (u16)cpu_state->memory[cpu_state->pc+1]; // lo
+                u16 lo = (u16)cpu_state->memory[cpu_state->pc+2] << 8; // hi
+                u16 address = hi | lo;
+
+                // sp[lower address] == lo
+                // sp[higher address] == hi
+                u16 sp_value_lo = (u16)cpu_state->memory[cpu_state->sp];
+                u16 sp_value_hi = (u16)cpu_state->memory[cpu_state->sp+1] << 8;
+                u16 sp_value = sp_value_hi | sp_value_lo;
+
+                cpu_state->memory[address] = (u8)(sp_value_hi >> 8);
+                cpu_state->memory[address+1] = (u8)(sp_value_lo);
+
+                cpu_state->pc += 3;
                 break;
             }
             // LD A, imm8
@@ -95,33 +119,33 @@ static void cpu_process()
 
 static b8 f_register_get_z()
 {
-    return cpu_state->registers.f & bit7 == bit7;
+    return (cpu_state->registers.f & bit7) == bit7;
 }
 
 static b8 f_register_get_n()
 {
-    return cpu_state->registers.f & bit6 == bit6;
+    return (cpu_state->registers.f & bit6) == bit6;
 }
 
 static b8 f_register_get_h()
 {
-    return cpu_state->registers.f & bit5 == bit5;
+    return (cpu_state->registers.f & bit5) == bit5;
 }
 
 static b8 f_register_get_c()
 {
-    return cpu_state->registers.f & bit4 == bit4;
+    return (cpu_state->registers.f & bit4) == bit4;
 }
 
 static void f_register_set_z(b8 flag)
 {
     if (flag)
     {
-        cpu_state->registers.f | bit7;
+        cpu_state->registers.f |= bit7;
     }
     else
     {
-        cpu_state->registers.f | (~bit7);
+        cpu_state->registers.f |= (~bit7);
     }
 }
 
@@ -129,11 +153,11 @@ static void f_register_set_n(b8 flag)
 {
     if (flag)
     {
-        cpu_state->registers.f | bit6;
+        cpu_state->registers.f |= bit6;
     }
     else
     {
-        cpu_state->registers.f | (~bit6);
+        cpu_state->registers.f |= (~bit6);
     }
 
 }
@@ -142,11 +166,11 @@ static void f_register_set_h(b8 flag)
 {
     if (flag)
     {
-        cpu_state->registers.f | bit5;
+        cpu_state->registers.f |= bit5;
     }
     else
     {
-        cpu_state->registers.f | (~bit5);
+        cpu_state->registers.f |= (~bit5);
     }
 }
 
@@ -154,11 +178,11 @@ static void f_register_set_c(b8 flag)
 {
     if (flag)
     {
-        cpu_state->registers.f | bit4;
+        cpu_state->registers.f |= bit4;
     }
     else
     {
-        cpu_state->registers.f | (~bit4);
+        cpu_state->registers.f |= (~bit4);
     }
 }
 
