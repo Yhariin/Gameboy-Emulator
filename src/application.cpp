@@ -42,11 +42,12 @@ static void application_initialize(ApplicationState *application_state)
     ApplicationState *state = application_state; // alias
     LOG_DEBUG("%u\n", state->arena->position);
 
-    const String rom_path = string_lit("../roms/instr_test.gb");
-    // const String rom_path = string_lit("../roms/hello-world.gb");
+    // const String rom_path = string_lit("../roms/instr_test.gb");
+    const String rom_path = string_lit("../roms/test1/test1.gb");
 
     OS_FileHandle rom_handle = os_open_file(OS_FileAccessFlag_Read, rom_path);
     DataHeader rom = os_read_file(state->arena, rom_handle, 0, 0);
+    os_close_file(rom_handle);
 
     cpu_init(state->arena, (u8 *)rom.data, rom.size);
     cpu_process();

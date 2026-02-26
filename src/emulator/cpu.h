@@ -12,6 +12,22 @@ struct Registers
     u8 l;
 };
 
+#define ROM_START   0x0000 // The game ROM supplied by the cartridge
+#define ROM_END     0x7FFF
+#define VRAM_START  0x8000 // Video RAM, where graphics are stored and arranged
+#define VRAM_END    0x9FFF
+#define SRAM_START  0xA000 // Save RAM, optionally supplied by the cartridge to save data to
+#define SRAM_END    0xBFFF
+#define WRAM_START  0xC000 // Work RAM, general-purpose RAM for the game to store things in
+#define WRAM_END    0xDFFF
+#define OAM_START   0xFE00 // Object Attribute Memory, where "objects" are stored
+#define OAM_END     0xFE9F
+#define IO_START    0xFF00 // Where you control the console
+#define IO_END      0xFF7F
+#define HRAM_START  0xFF80 // High RAM, a tiny bit of general-purpose RAM with faster access
+#define HRAM_END    0xFFFE
+#define IE          0xFFFF // A lone I/O byte that's separated from the rest for some reason
+
 static b8 f_register_get_z();
 static b8 f_register_get_n();
 static b8 f_register_get_h();
