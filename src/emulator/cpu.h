@@ -28,6 +28,10 @@ struct Registers
 #define HRAM_END    0xFFFE
 #define IE          0xFFFF // A lone I/O byte that's separated from the rest for some reason
 
+// z - Zero flag
+// n - Subtraction flag (BCD)
+// h - Half Carry flag (BCD)
+// c - Carry flag
 static b8 f_register_get_z();
 static b8 f_register_get_n();
 static b8 f_register_get_h();

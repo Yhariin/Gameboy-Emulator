@@ -55,6 +55,11 @@ static void cpu_process()
             case 0x04:
             {
                 cpu_state->registers.b += 1;
+
+                f_register_set_z(cpu_state->registers.b == 0);
+                f_register_set_n(false);
+                f_register_set_h((((cpu_state->registers.b-1) & 0x0F) + 1) > 0x0F);
+
                 cpu_state->pc += 1;
                 break;
             }
@@ -62,6 +67,11 @@ static void cpu_process()
             case 0x05:
             {
                 cpu_state->registers.b -= 1;
+
+                f_register_set_z(cpu_state->registers.b == 0);
+                f_register_set_n(true);
+                f_register_set_h(((cpu_state->registers.b+1) & 0x0F) < 1);
+
                 cpu_state->pc += 1;
                 break;
             }
@@ -105,6 +115,83 @@ static void cpu_process()
                 cpu_state->pc += 3;
                 break;
             }
+            // ADD HL, BC
+            case 0x09:
+            {
+                u16 hl = get_HL();
+                u16 bc = get_BC();
+
+                set_HL(get_HL() + get_BC());
+
+                f_register_set_n(false);
+                f_register_set_h(((hl & 0xFFF) + (bc & 0xFFF)) > 0xFFF);
+                f_register_set_c((hl+bc) > 0xFFFF);
+
+                cpu_state->pc += 1;
+                break;
+            }
+            // LD A, [BC]
+            case 0x0A:
+            {
+                cpu_state->registers.a = cpu_state->memory[get_BC()];
+
+                cpu_state->pc += 1;
+                break;
+            }
+            // DEC BC
+            case 0x0B:
+            {
+                set_BC(get_BC()-1);
+
+                cpu_state->pc += 1;
+                break;
+            }
+            // INC C
+            case 0x0C:
+            {
+                cpu_state->registers.c += 1;
+
+                f_register_set_z(cpu_state->registers.c == 0);
+                f_register_set_n(false);
+                f_register_set_h((((cpu_state->registers.c-1) & 0x0F) + 1) > 0x0F);
+
+                cpu_state->pc += 1;
+                break;
+            }
+            // DEC C
+            case 0x0D:
+            {
+                cpu_state->registers.c -= 1;
+
+                f_register_set_z(cpu_state->registers.c == 0);
+                f_register_set_n(true);
+                f_register_set_h(((cpu_state->registers.c+1) & 0x0F) < 1);
+
+                cpu_state->pc += 1;
+                break;
+            }
+            // LD C, imm8
+            case 0x0E:
+            {
+                cpu_state->registers.c = cpu_state->memory[cpu_state->pc+1];
+                cpu_state->pc += 2;
+                break;
+            }
+            // RRCA
+            case 0x0F:
+            {
+                f_register_set_c(bit1 & cpu_state->registers.a);
+                cpu_state->registers.a = cpu_state->registers.a >> 1 | (f_register_get_c() << 7);
+
+                cpu_state->pc += 1;
+                break;
+            }
+            // TODO: STOP
+            case 0x10:
+            {
+                cpu_state->pc += 2;
+                break;
+            }
             // LD DE, imm16
             case 0x11:
             {
@@ -112,6 +199,142 @@ static void cpu_process()
                 cpu_state->registers.d = cpu_state->memory[cpu_state->pc+2]; // hi
 
                 cpu_state->pc += 3;
+                break;
+            }
+            // LD [DE], A
+            case 0x12:
+            {
+                u16 address = get_DE();
+                if ((address < WRAM_START || address > WRAM_END) && (address < HRAM_START || address > HRAM_END))
+                {
+                    cpu_state->pc += 1;
+                    break;
+                }
+                cpu_state->memory[get_DE()] = cpu_state->registers.a;
+                cpu_state->pc += 1;
+                break;
+            }
+            // INC DE
+            case 0x13:
+            {
+                set_DE(get_DE() + 1);
+                cpu_state->pc += 1;
+                break;
+            }
+            // INC D
+            case 0x14:
+            {
+                cpu_state->registers.d += 1;
+
+                f_register_set_z(cpu_state->registers.d == 0);
+                f_register_set_n(false);
+                f_register_set_h((((cpu_state->registers.d-1) & 0x0F) + 1) > 0x0F);
+
+                cpu_state->pc += 1;
+                break;
+            }
+            // DEC D
+            case 0x15:
+            {
+                cpu_state->registers.d -= 1;
+
+                f_register_set_z(cpu_state->registers.d == 0);
+                f_register_set_n(true);
+                f_register_set_h(((cpu_state->registers.d+1) & 0x0F) < 1);
+
+                cpu_state->pc += 1;
+                break;
+            }
+            // LD D, imm8
+            case 0x16:
+            {
+                cpu_state->registers.d = cpu_state->memory[cpu_state->pc+1];
+                cpu_state->pc += 2;
+                break;
+            }
+            // RLA
+            case 0x17:
+            {
+                cpu_state->registers.a = cpu_state->registers.a << 1 | f_register_get_c();
+
+                cpu_state->pc += 1;
+                break;
+            }
+            // JR imm8
+            case 0x18:
+            {
+                cpu_state->pc += (i8)cpu_state->memory[cpu_state->pc+1];
+
+                cpu_state->pc += 2;
+                break;
+            }
+            // ADD HL, DE
+            case 0x19:
+            {
+                u16 hl = get_HL();
+                u16 de = get_DE();
+
+                set_HL(get_HL() + get_DE());
+
+                f_register_set_n(false);
+                f_register_set_h(((hl & 0xFFF) + (de & 0xFFF)) > 0xFFF);
+                f_register_set_c((hl+de) > 0xFFFF);
+
+                cpu_state->pc += 1;
+                break;
+            }
+            // LD A, [DE]
+            case 0x1A:
+            {
+                cpu_state->registers.a = cpu_state->memory[get_DE()];
+
+                cpu_state->pc += 1;
+                break;
+            }
+            // DEC DE
+            case 0x1B:
+            {
+                set_DE(get_DE()-1);
+
+                cpu_state->pc += 1;
+                break;
+            }
+            // INC E
+            case 0x1C:
+            {
+                cpu_state->registers.e += 1;
+
+                f_register_set_z(cpu_state->registers.e == 0);
+                f_register_set_n(false);
+                f_register_set_h((((cpu_state->registers.e-1) & 0x0F) + 1) > 0x0F);
+
+                cpu_state->pc += 1;
+                break;
+            }
+            // DEC E
+            case 0x1D:
+            {
+                cpu_state->registers.d -= 1;
+
+                f_register_set_z(cpu_state->registers.d == 0);
+                f_register_set_n(true);
+                f_register_set_h(((cpu_state->registers.d+1) & 0x0F) < 1);
+
+                cpu_state->pc += 1;
+                break;
+            }
+            // LD E, imm8
+            case 0x1E:
+            {
+                cpu_state->registers.e = cpu_state->memory[cpu_state->pc+1];
+                cpu_state->pc += 2;
+                break;
+            }
+            case 0x1F:
+            {
+                cpu_state->registers.a = cpu_state->registers.a >> 1 | (f_register_get_c() << 7);
+
+                cpu_state->pc += 1;
                 break;
             }
             // LD HL, imm16
