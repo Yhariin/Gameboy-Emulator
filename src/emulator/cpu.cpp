@@ -690,20 +690,379 @@ static void cpu_process()
                 f_register_set_h(false);
                 f_register_set_c(!f_register_get_c());
             }
-            // LD B, B
+            // LD reg, reg
             case 0x40:
+            case 0x41:
+            case 0x42:
+            case 0x43:
+            case 0x44:
+            case 0x45:
+            case 0x46:
+            case 0x47:
+            case 0x48:
+            case 0x49:
+            case 0x4A:
+            case 0x4B:
+            case 0x4C:
+            case 0x4D:
+            case 0x4E:
+            case 0x4F:
+            case 0x50:
+            case 0x51:
+            case 0x52:
+            case 0x53:
+            case 0x54:
+            case 0x55:
+            case 0x56:
+            case 0x57:
+            case 0x58:
+            case 0x59:
+            case 0x5A:
+            case 0x5B:
+            case 0x5C:
+            case 0x5D:
+            case 0x5E:
+            case 0x5F:
+            case 0x60:
+            case 0x61:
+            case 0x62:
+            case 0x63:
+            case 0x64:
+            case 0x65:
+            case 0x66:
+            case 0x67:
+            case 0x68:
+            case 0x69:
+            case 0x6A:
+            case 0x6B:
+            case 0x6C:
+            case 0x6D:
+            case 0x6E:
+            case 0x6F:
+            case 0x70:
+            case 0x71:
+            case 0x72:
+            case 0x73:
+            case 0x74:
+            case 0x75:
+            // TODO: HALT
+            case 0x76:
             {
-                cpu_state->registers.b = cpu_state->registers.b;
                 cpu_state->pc += 1;
                 break;
             }
-            // ADD A, B
+            case 0x77:
+            case 0x78:
+            case 0x79:
+            case 0x7A:
+            case 0x7B:
+            case 0x7C:
+            case 0x7D:
+            case 0x7E:
+            case 0x7F:
+            {
+                u8 instruction = cpu_state->memory[cpu_state->pc];
+
+                u8 src, dst;
+
+                if ((instruction & 0x40) == 0x40)
+                {
+                    if ((instruction & 0x0F) < 0x08)
+                    {
+                        dst = cpu_state->registers.b;
+                    }
+                    else
+                    {
+                        dst = cpu_state->registers.c;
+                    }
+                }
+                else if ((instruction & 0x50) == 0x50)
+                {
+                    if ((instruction & 0x0F) < 0x08)
+                    {
+                        dst = cpu_state->registers.d;
+                    }
+                    else
+                    {
+                        dst = cpu_state->registers.e;
+                    }
+                }
+                else if ((instruction & 0x60) == 0x60)
+                {
+                    if ((instruction & 0x0F) < 0x08)
+                    {
+                        dst = cpu_state->registers.h;
+                    }
+                    else
+                    {
+                        dst = cpu_state->registers.l;
+                    }
+                }
+                else if ((instruction & 0x70) == 0x70)
+                {
+                    if ((instruction & 0x0F) < 0x08)
+                    {
+                        dst = cpu_state->memory[get_HL()];
+                    }
+                    else
+                    {
+                        dst = cpu_state->registers.a;
+                    }
+                }
+
+                switch((instruction & 0x0F) % 8)
+                {
+                    case 0:
+                        src = cpu_state->registers.b;
+                        break;
+                    case 1:
+                        src = cpu_state->registers.c;
+                        break;
+                    case 2:
+                        src = cpu_state->registers.d;
+                        break;
+                    case 3:
+                        src = cpu_state->registers.e;
+                        break;
+                    case 4:
+                        src = cpu_state->registers.h;
+                        break;
+                    case 5:
+                        src = cpu_state->registers.l;
+                        break;
+                    case 6:
+                        src = cpu_state->memory[get_HL()];
+                        break;
+                    case 7:
+                        src = cpu_state->registers.a;
+                        break;
+                }
+
+                dst = src;
+
+                cpu_state->pc += 1;
+                break;
+            }
+            // ADD A, reg
             case 0x80:
+            case 0x81:
+            case 0x82:
+            case 0x83:
+            case 0x84:
+            case 0x85:
+            case 0x86:
+            case 0x87:
+            // ADC A, reg
+            case 0x88:
+            case 0x89:
+            case 0x8A:
+            case 0x8B:
+            case 0x8C:
+            case 0x8D:
+            case 0x8E:
+            case 0x8F:
+            // SUB A, reg
+            case 0x90:
+            case 0x91:
+            case 0x92:
+            case 0x93:
+            case 0x94:
+            case 0x95:
+            case 0x96:
+            case 0x97:
+            // ADC A, reg
+            case 0x98:
+            case 0x99:
+            case 0x9A:
+            case 0x9B:
+            case 0x9C:
+            case 0x9D:
+            case 0x9E:
+            case 0x9F:
+
             {
-                cpu_state->registers.a += cpu_state->registers.b;
+                u8 instruction = cpu_state->memory[cpu_state->pc];
+                u8 src;
+                switch(instruction & 0x0F)
+                {
+                    case 0x00:
+                        src = cpu_state->registers.b;
+                        break;
+                    case 0x01:
+                        src = cpu_state->registers.c;
+                        break;
+                    case 0x02:
+                        src = cpu_state->registers.d;
+                        break;
+                    case 0x03:
+                        src = cpu_state->registers.e;
+                        break;
+                    case 0x04:
+                        src = cpu_state->registers.h;
+                        break;
+                    case 0x05:
+                        src = cpu_state->registers.l;
+                        break;
+                    case 0x06:
+                        src = cpu_state->memory[get_HL()];
+                        break;
+                    case 0x07:
+                        src = cpu_state->registers.a;
+                        break;
+                    case 0x08:
+                        src = cpu_state->registers.b; + (u8)f_register_get_c();
+                    case 0x09:
+                        src = cpu_state->registers.c; + (u8)f_register_get_c();
+                    case 0x0A:
+                        src = cpu_state->registers.d; + (u8)f_register_get_c();
+                    case 0x0B:
+                        src = cpu_state->registers.e; + (u8)f_register_get_c();
+                    case 0x0C:
+                        src = cpu_state->registers.h; + (u8)f_register_get_c();
+                    case 0x0D:
+                        src = cpu_state->registers.l; + (u8)f_register_get_c();
+                    case 0x0E:
+                        src = cpu_state->memory[get_HL()]; + (u8)f_register_get_c();
+                    case 0x0F:
+                        src = cpu_state->registers.a; + (u8)f_register_get_c();
+                }
+
+                if (instruction & 0x80 == 0x80) // Addition
+                {
+                    cpu_state->registers.a += src;
+
+                    f_register_set_z(cpu_state->registers.a == 0);
+                    f_register_set_n(false);
+                    f_register_set_h((((cpu_state->registers.a-src) & 0x0F) + (src & 0x0F)) > 0x0F);
+                    f_register_set_c(cpu_state->registers.a > 0xFF);
+                }
+                else // Subtraction
+                {
+                    cpu_state->registers.a -= src;
+
+                    f_register_set_z(cpu_state->registers.a == 0);
+                    f_register_set_n(true);
+                    f_register_set_h(((cpu_state->registers.a+src) & 0x0F) < (src & 0x0F));
+                    f_register_set_c(cpu_state->registers.a < 0xFF);
+                }
+
                 cpu_state->pc += 1;
                 break;
             }
+            case 0xA0:
+            case 0xA1:
+            case 0xA2:
+            case 0xA3:
+            case 0xA4:
+            case 0xA5:
+            case 0xA6:
+            case 0xA7:
+            case 0xA8:
+            case 0xA9:
+            case 0xAA:
+            case 0xAB:
+            case 0xAC:
+            case 0xAD:
+            case 0xAE:
+            case 0xAF:
+            case 0xB0:
+            case 0xB1:
+            case 0xB2:
+            case 0xB3:
+            case 0xB4:
+            case 0xB5:
+            case 0xB6:
+            case 0xB7:
+            case 0xB8:
+            case 0xB9:
+            case 0xBA:
+            case 0xBB:
+            case 0xBC:
+            case 0xBD:
+            case 0xBE:
+            case 0xBF:
+            {
+                u8 instruction = cpu_state->memory[cpu_state->pc];
+                u8 src;
+                switch ((instruction & 0x0F) % 8)
+                {
+                    case 0x00:
+                        src = cpu_state->registers.b;
+                        break;
+                    case 0x01:
+                        src = cpu_state->registers.c;
+                        break;
+                    case 0x02:
+                        src = cpu_state->registers.d;
+                        break;
+                    case 0x03:
+                        src = cpu_state->registers.e;
+                        break;
+                    case 0x04:
+                        src = cpu_state->registers.h;
+                        break;
+                    case 0x05:
+                        src = cpu_state->registers.l;
+                        break;
+                    case 0x06:
+                        src = cpu_state->memory[get_HL()];
+                        break;
+                    case 0x07:
+                        src = cpu_state->registers.a;
+                        break;
+                }
+
+                if (instruction & 0xA0 == 0xA0)
+                {
+                    // AND reg
+                    if (instruction & 0x0F < 0x08)
+                    {
+                        cpu_state->registers.a &= src;
+
+                        f_register_set_z(cpu_state->registers.a == 0);
+                        f_register_set_n(false);
+                        f_register_set_h(true);
+                        f_register_set_c(false);
+                    }
+                    // XOR reg
+                    else
+                    {
+                        cpu_state->registers.a ^= src;
+
+                        f_register_set_z(cpu_state->registers.a == 0);
+                        f_register_set_n(false);
+                        f_register_set_h(false);
+                        f_register_set_c(false);
+                    }
+                }
+                else
+                {
+                    // OR reg
+                    if (instruction & 0x0F < 0x08)
+                    {
+                        cpu_state->registers.a |= src;
+
+                        f_register_set_z(cpu_state->registers.a == 0);
+                        f_register_set_n(false);
+                        f_register_set_h(false);
+                        f_register_set_c(false);
+                    }
+                    // CP reg
+                    else
+                    {
+                        f_register_set_z((cpu_state->registers.a - src) == 0);
+                        f_register_set_n(true);
+                        f_register_set_h(((cpu_state->registers.a+src) & 0x0F) < (src & 0x0F));
+                        f_register_set_c(cpu_state->registers.a < 0xFF);
+                    }
+
+                }
+
+                cpu_state->pc += 1;
+                break;
+            }
+
+
             // POP BC
             case 0xC1:
             {
