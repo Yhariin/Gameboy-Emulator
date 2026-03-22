@@ -47,6 +47,7 @@ struct CPU_State
     Registers registers;
     u16 pc;
     u16 sp;
+    b8 is_halted;
     u8 *memory;
 };
 
@@ -66,3 +67,4 @@ static void set_HL(u16 value);
 
 static void cpu_init(Arena *arena, u8 *rom_data, u64 rom_size);
 static void cpu_process();
+static void process_16_bit_opcodes(u8 low);

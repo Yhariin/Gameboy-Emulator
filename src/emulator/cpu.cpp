@@ -3,6 +3,7 @@ static void cpu_init(Arena *arena, u8* rom_data, u64 rom_size)
     cpu_state = (CPU_State *)arena_alloc_align(arena, sizeof(CPU_State), sizeof(CPU_State));
     cpu_state->memory = (u8 *)arena_alloc_align(arena, 0xFFFF, sizeof(u8));
     cpu_state->sp = 0xFFFE;
+    cpu_state->is_halted = false;
 
     ASSERT(rom_size <= 0x8000, "ERROR Rom size must be at most 32kb!");
     memcpy(cpu_state->memory, rom_data, rom_size);
@@ -14,6 +15,11 @@ static void cpu_process()
 
     while(cpu_state->pc < 0x8000)
     {
+        if (cpu_state->is_halted)
+        {
+            continue;
+        }
+
         switch(cpu_state->memory[cpu_state->pc])
         {
             // NOP
@@ -748,6 +754,8 @@ static void cpu_process()
             // TODO: HALT
             case 0x76:
             {
+                cpu_state->is_halted = true;
+
                 cpu_state->pc += 1;
                 break;
             }
@@ -910,21 +918,21 @@ static void cpu_process()
                         src = cpu_state->registers.a;
                         break;
                     case 0x08:
-                        src = cpu_state->registers.b; + (u8)f_register_get_c();
+                        src = cpu_state->registers.b + (u8)f_register_get_c();
                     case 0x09:
-                        src = cpu_state->registers.c; + (u8)f_register_get_c();
+                        src = cpu_state->registers.c + (u8)f_register_get_c();
                     case 0x0A:
-                        src = cpu_state->registers.d; + (u8)f_register_get_c();
+                        src = cpu_state->registers.d + (u8)f_register_get_c();
                     case 0x0B:
-                        src = cpu_state->registers.e; + (u8)f_register_get_c();
+                        src = cpu_state->registers.e + (u8)f_register_get_c();
                     case 0x0C:
-                        src = cpu_state->registers.h; + (u8)f_register_get_c();
+                        src = cpu_state->registers.h + (u8)f_register_get_c();
                     case 0x0D:
-                        src = cpu_state->registers.l; + (u8)f_register_get_c();
+                        src = cpu_state->registers.l + (u8)f_register_get_c();
                     case 0x0E:
-                        src = cpu_state->memory[get_HL()]; + (u8)f_register_get_c();
+                        src = cpu_state->memory[get_HL()] + (u8)f_register_get_c();
                     case 0x0F:
-                        src = cpu_state->registers.a; + (u8)f_register_get_c();
+                        src = cpu_state->registers.a + (u8)f_register_get_c();
                 }
 
                 if (instruction & 0x80 == 0x80) // Addition
@@ -1061,8 +1069,23 @@ static void cpu_process()
                 cpu_state->pc += 1;
                 break;
             }
+            // RET NZ
+            case 0xC0:
+            {
+                if (!f_register_get_z())
+                {
+                    u16 l = cpu_state->memory[cpu_state->sp++];
+                    u16 h = cpu_state->memory[cpu_state->sp++];
 
+                    cpu_state->pc = (l | h << 8);
+                }
+                else
+                {
+                    cpu_state->pc += 1;
+                }
 
+                break;
+            }
             // POP BC
             case 0xC1:
             {
@@ -1070,6 +1093,54 @@ static void cpu_process()
                 cpu_state->registers.b = cpu_state->memory[cpu_state->sp++]; // hi
 
                 cpu_state->pc += 1;
+                break;
+            }
+            // JP NZ, imm16
+            case 0xC2:
+            {
+                if (!f_register_get_z())
+                {
+                    u16 l = cpu_state->memory[cpu_state->pc+1];
+                    u16 h = cpu_state->memory[cpu_state->pc+2];
+
+                    cpu_state->pc = (l | h << 8);
+                }
+                else
+                {
+                    cpu_state->pc += 3;
+                }
+
+                break;
+            }
+            // JP imm16
+            case 0xC3:
+            {
+                u16 l = cpu_state->memory[cpu_state->pc+1];
+                u16 h = cpu_state->memory[cpu_state->pc+2];
+
+                cpu_state->pc = (l | h << 8);
+
+                break;
+            }
+            // CALL NZ, imm16
+            case 0xC4:
+            {
+                if (!f_register_get_z())
+                {
+                    u16 ret_addr = cpu_state->pc + 3;
+                    cpu_state->memory[--cpu_state->sp] = (ret_addr & 0xFF00) >> 8;
+                    cpu_state->memory[--cpu_state->sp] = (ret_addr & 0x00FF);
+
+                    u16 l = cpu_state->memory[cpu_state->pc+1];
+                    u16 h = cpu_state->memory[cpu_state->pc+2];
+
+                    cpu_state->pc = (l | h << 8);
+                }
+                else
+                {
+                    cpu_state->pc += 3;
+                }
+
                 break;
             }
             // PUSH BC
@@ -1081,6 +1152,157 @@ static void cpu_process()
                 cpu_state->pc += 1;
                 break;
             }
+            // ADD A, imm8
+            case 0xC6:
+            {
+                u8 src = cpu_state->memory[cpu_state->pc+1];
+                cpu_state->registers.a += src;
+
+                f_register_set_z(cpu_state->registers.a == 0);
+                f_register_set_n(false);
+                f_register_set_h((((cpu_state->registers.a-src) & 0x0F) + (src & 0x0F)) > 0x0F);
+                f_register_set_c(cpu_state->registers.a > 0xFF);
+
+                cpu_state->pc += 2;
+                break;
+            }
+            // RST 00H
+            case 0xC7:
+            {
+                u16 ret_addr = cpu_state->pc + 1;
+                cpu_state->memory[--cpu_state->sp] = (ret_addr & 0xFF00) >> 8;
+                cpu_state->memory[--cpu_state->sp] = (ret_addr & 0x00FF);
+
+                cpu_state->pc = 0x0000;
+                break;
+            }
+            // RET Z
+            case 0xC8:
+            {
+                if (f_register_get_z())
+                {
+                    u16 l = cpu_state->memory[cpu_state->sp++];
+                    u16 h = cpu_state->memory[cpu_state->sp++];
+
+                    cpu_state->pc = (l | h << 8);
+                }
+                else
+                {
+                    cpu_state->pc += 1;
+                }
+
+                break;
+            }
+            // RET
+            case 0xC9:
+            {
+                u16 l = cpu_state->memory[cpu_state->sp++];
+                u16 h = cpu_state->memory[cpu_state->sp++];
+
+                cpu_state->pc = (l | h << 8);
+
+                break;
+            }
+            // JP Z, imm16
+            case 0xCA:
+            {
+                if (f_register_get_z())
+                {
+                    u16 l = cpu_state->memory[cpu_state->pc+1];
+                    u16 h = cpu_state->memory[cpu_state->pc+2];
+
+                    cpu_state->pc = (l | h << 8);
+                }
+                else
+                {
+                    cpu_state->pc += 3;
+                }
+
+                break;
+            }
+            // 16-bit opcodes with 0xCB prefix
+            case 0xCB:
+            {
+                process_16_bit_opcodes(cpu_state->memory[cpu_state->pc+1]);
+
+                cpu_state->pc += 2;
+                break;
+            }
+            // CALL Z, imm16
+            case 0xCC:
+            {
+                if (f_register_get_z())
+                {
+                    u16 ret_addr = cpu_state->pc + 3;
+                    cpu_state->memory[--cpu_state->sp] = (ret_addr & 0xFF00) >> 8;
+                    cpu_state->memory[--cpu_state->sp] = (ret_addr & 0x00FF);
+
+                    u16 l = cpu_state->memory[cpu_state->pc+1];
+                    u16 h = cpu_state->memory[cpu_state->pc+2];
+
+                    cpu_state->pc = (l | h << 8);
+                }
+                else
+                {
+                    cpu_state->pc += 3;
+                }
+
+                break;
+            }
+            // CALL imm16
+            case 0xCD:
+            {
+                u16 ret_addr = cpu_state->pc + 3;
+                cpu_state->memory[--cpu_state->sp] = (ret_addr & 0xFF00) >> 8;
+                cpu_state->memory[--cpu_state->sp] = (ret_addr & 0x00FF);
+
+                u16 l = cpu_state->memory[cpu_state->pc+1];
+                u16 h = cpu_state->memory[cpu_state->pc+2];
+
+                cpu_state->pc = (l | h << 8);
+
+                break;
+            }
+            // ADC A, imm8
+            case 0xCE:
+            {
+                u8 src = cpu_state->memory[cpu_state->pc+1] + (u8)f_register_get_c();
+                cpu_state->registers.a += src;
+
+                f_register_set_z(cpu_state->registers.a == 0);
+                f_register_set_n(false);
+                f_register_set_h((((cpu_state->registers.a-src) & 0x0F) + (src & 0x0F)) > 0x0F);
+                f_register_set_c(cpu_state->registers.a > 0xFF);
+
+                break;
+            }
+            // RST 08H
+            {
+                u16 ret_addr = cpu_state->pc + 1;
+                cpu_state->memory[--cpu_state->sp] = (ret_addr & 0xFF00) >> 8;
+                cpu_state->memory[--cpu_state->sp] = (ret_addr & 0x00FF);
+
+                cpu_state->pc = 0x0080;
+                break;
+
+            }
+            // RET NC
+            case 0xD0:
+            {
+                if (!f_register_get_c())
+                {
+                    u16 l = cpu_state->memory[cpu_state->sp++];
+                    u16 h = cpu_state->memory[cpu_state->sp++];
+
+                    cpu_state->pc = (l | h << 8);
+                }
+                else
+                {
+                    cpu_state->pc += 1;
+                }
+
+                break;
+            }
             // POP DE
             case 0xD1:
             {
@@ -1088,6 +1310,44 @@ static void cpu_process()
                 cpu_state->registers.d = cpu_state->memory[cpu_state->sp++]; // hi
 
                 cpu_state->pc += 1;
+                break;
+            }
+            // JP NC, imm16
+            case 0xD2:
+            {
+                if (!f_register_get_c())
+                {
+                    u16 l = cpu_state->memory[cpu_state->pc+1];
+                    u16 h = cpu_state->memory[cpu_state->pc+2];
+
+                    cpu_state->pc = (l | h << 8);
+                }
+                else
+                {
+                    cpu_state->pc += 3;
+                }
+
+                break;
+            }
+            // CALL NC, imm16
+            case 0xD4:
+            {
+                if (!f_register_get_c())
+                {
+                    u16 ret_addr = cpu_state->pc + 3;
+                    cpu_state->memory[--cpu_state->sp] = (ret_addr & 0xFF00) >> 8;
+                    cpu_state->memory[--cpu_state->sp] = (ret_addr & 0x00FF);
+
+                    u16 l = cpu_state->memory[cpu_state->pc+1];
+                    u16 h = cpu_state->memory[cpu_state->pc+2];
+
+                    cpu_state->pc = (l | h << 8);
+                }
+                else
+                {
+                    cpu_state->pc += 3;
+                }
+
                 break;
             }
             // PUSH DE
@@ -1099,11 +1359,145 @@ static void cpu_process()
                 cpu_state->pc += 1;
                 break;
             }
+            // SUB imm8
+            case 0xD6:
+            {
+                u8 src = cpu_state->memory[cpu_state->pc+1];
+                cpu_state->registers.a -= src;
+
+                f_register_set_z(cpu_state->registers.a == 0);
+                f_register_set_n(true);
+                f_register_set_h(((cpu_state->registers.a+src) & 0x0F) < (src & 0x0F));
+                f_register_set_c(cpu_state->registers.a < 0xFF);
+
+                cpu_state->pc += 2;
+                break;
+            }
+            // RST 10H
+            case 0xD7:
+            {
+                u16 ret_addr = cpu_state->pc + 1;
+                cpu_state->memory[--cpu_state->sp] = (ret_addr & 0xFF00) >> 8;
+                cpu_state->memory[--cpu_state->sp] = (ret_addr & 0x00FF);
+
+                cpu_state->pc = 0x0010;
+                break;
+            }
+            // RET C
+            case 0xD8:
+            {
+                if (f_register_get_c())
+                {
+                    u16 l = cpu_state->memory[cpu_state->sp++];
+                    u16 h = cpu_state->memory[cpu_state->sp++];
+
+                    cpu_state->pc = (l | h << 8);
+                }
+                else
+                {
+                    cpu_state->pc += 1;
+                }
+
+                break;
+            }
+            // TODO: RETI
+            case 0xD9:
+            {
+                cpu_state->pc += 1;
+                break;
+            }
+            // JP C, imm16
+            case 0xDA:
+            {
+                if (f_register_get_c())
+                {
+                    u16 l = cpu_state->memory[cpu_state->pc+1];
+                    u16 h = cpu_state->memory[cpu_state->pc+2];
+
+                    cpu_state->pc = (l | h << 8);
+                }
+                else
+                {
+                    cpu_state->pc += 3;
+                }
+
+                break;
+            }
+            // CALL C, imm16
+            case 0xDC:
+            {
+                if (f_register_get_c())
+                {
+                    u16 ret_addr = cpu_state->pc + 3;
+                    cpu_state->memory[--cpu_state->sp] = (ret_addr & 0xFF00) >> 8;
+                    cpu_state->memory[--cpu_state->sp] = (ret_addr & 0x00FF);
+
+                    u16 l = cpu_state->memory[cpu_state->pc+1];
+                    u16 h = cpu_state->memory[cpu_state->pc+2];
+
+                    cpu_state->pc = (l | h << 8);
+                }
+                else
+                {
+                    cpu_state->pc += 3;
+                }
+
+                break;
+            }
+            // SBC A, imm8
+            case 0xDE:
+            {
+                u8 src = cpu_state->memory[cpu_state->pc+1] + (u8)f_register_get_c();
+                cpu_state->registers.a -= src;
+
+                f_register_set_z(cpu_state->registers.a == 0);
+                f_register_set_n(true);
+                f_register_set_h(((cpu_state->registers.a+src) & 0x0F) < (src & 0x0F));
+                f_register_set_c(cpu_state->registers.a < 0xFF);
+
+                cpu_state->pc += 2;
+                break;
+            }
+            // RST 18H
+            case 0xDF:
+            {
+                u16 ret_addr = cpu_state->pc + 1;
+                cpu_state->memory[--cpu_state->sp] = (ret_addr & 0xFF00) >> 8;
+                cpu_state->memory[--cpu_state->sp] = (ret_addr & 0x00FF);
+
+                cpu_state->pc = 0x0018;
+                break;
+            }
+            // LD [imm8], A
+            case 0xE0:
+            {
+                u16 address = 0xFF00 | cpu_state->memory[cpu_state->pc+1];
+                cpu_state->memory[address] = cpu_state->registers.a;
+
+                cpu_state->pc += 2;
+                break;
+            }
             // POP HL
             case 0xE1:
             {
                 cpu_state->registers.l = cpu_state->memory[cpu_state->sp++]; // lo
                 cpu_state->registers.h = cpu_state->memory[cpu_state->sp++]; // hi
+
+                cpu_state->pc += 1;
+                break;
+            }
+            // LD [C], A
+            case 0xE2:
+            {
+                u16 address = 0xFF00 | cpu_state->registers.c;
+
+                if ((address < WRAM_START || address > WRAM_END) && (address < HRAM_START || address > HRAM_END))
+                {
+                    cpu_state->pc += 1;
+                    break;
+                }
+
+                cpu_state->memory[address] = cpu_state->registers.a;
 
                 cpu_state->pc += 1;
                 break;
@@ -1117,12 +1511,122 @@ static void cpu_process()
                 cpu_state->pc += 1;
                 break;
             }
+            // AND imm8
+            case 0xE6:
+            {
+                cpu_state->registers.a &= cpu_state->memory[cpu_state->pc+1];
+
+                f_register_set_z(cpu_state->registers.a == 0);
+                f_register_set_n(false);
+                f_register_set_h(true);
+                f_register_set_c(false);
+
+                cpu_state->pc += 2;
+                break;
+            }
+            // RST 20H
+            case 0xE7:
+            {
+                u16 ret_addr = cpu_state->pc + 1;
+                cpu_state->memory[--cpu_state->sp] = (ret_addr & 0xFF00) >> 8;
+                cpu_state->memory[--cpu_state->sp] = (ret_addr & 0x00FF);
+
+                cpu_state->pc = 0x0020;
+                break;
+            }
+            // ADD SP, imm8
+            case 0xE8:
+            {
+                u16 sp = cpu_state->sp;
+                u16 imm8 = cpu_state->memory[cpu_state->pc+1];
+
+                cpu_state->sp += imm8;
+
+                f_register_set_z(false);
+                f_register_set_n(false);
+                f_register_set_h(((sp & 0xFFF) + (imm8 & 0xFFF)) > 0xFFF);
+                f_register_set_c((sp + imm8) > 0xFFFF);
+
+                cpu_state->pc += 2;
+                break;
+            }
+            // JP HL
+            case 0xE9:
+            {
+                cpu_state->pc = get_HL();
+                break;
+            }
+            // LD [imm16], A
+            case 0xEA:
+            {
+                u16 lo = (u16)cpu_state->memory[cpu_state->pc+1];
+                u16 hi = (u16)cpu_state->memory[cpu_state->pc+2] << 8;
+                u16 address = hi | lo;
+
+                if ((address < WRAM_START || address > WRAM_END) && (address < HRAM_START || address > HRAM_END))
+                {
+                    cpu_state->pc += 3;
+                    break;
+                }
+
+                cpu_state->memory[address] = cpu_state->registers.a;
+
+                cpu_state->pc += 3;
+                break;
+            }
+            // XOR imm8
+            case 0xEE:
+            {
+                cpu_state->registers.a ^= cpu_state->memory[cpu_state->pc+1];
+
+                f_register_set_z(cpu_state->registers.a == 0);
+                f_register_set_n(false);
+                f_register_set_h(false);
+                f_register_set_c(false);
+
+                cpu_state->pc += 2;
+                break;
+            }
+            // RST 28H
+            case 0xEF:
+            {
+                u16 ret_addr = cpu_state->pc + 1;
+                cpu_state->memory[--cpu_state->sp] = (ret_addr & 0xFF00) >> 8;
+                cpu_state->memory[--cpu_state->sp] = (ret_addr & 0x00FF);
+
+                cpu_state->pc = 0x0028;
+                break;
+            }
+            // LD A, [imm8]
+            case 0xF0:
+            {
+                u16 address = 0xFF00 | cpu_state->memory[cpu_state->pc+1];
+                cpu_state->registers.a = cpu_state->memory[address];
+
+                cpu_state->pc += 2;
+                break;
+            }
             // POP AF
             case 0xF1:
             {
                 cpu_state->registers.f = cpu_state->memory[cpu_state->sp++]; // lo
                 cpu_state->registers.a = cpu_state->memory[cpu_state->sp++]; // hi
 
+                cpu_state->pc += 1;
+                break;
+            }
+            // LD A, [C]
+            case 0xF2:
+            {
+                u16 address = 0xFF00 | cpu_state->registers.c;
+                cpu_state->registers.a = cpu_state->memory[address];
+
+                cpu_state->pc += 2;
+                break;
+            }
+            // TODO: DI
+            case 0xF3:
+            {
                 cpu_state->pc += 1;
                 break;
             }
@@ -1135,6 +1639,96 @@ static void cpu_process()
                 cpu_state->pc += 1;
                 break;
             }
+            // OR imm8
+            case 0xF6:
+            {
+                cpu_state->registers.a |= cpu_state->memory[cpu_state->pc+1];
+
+                f_register_set_z(cpu_state->registers.a == 0);
+                f_register_set_n(false);
+                f_register_set_h(false);
+                f_register_set_c(false);
+
+                cpu_state->pc += 2;
+                break;
+            }
+            // RST 30H
+            case 0xF7:
+            {
+                u16 ret_addr = cpu_state->pc + 1;
+                cpu_state->memory[--cpu_state->sp] = (ret_addr & 0xFF00) >> 8;
+                cpu_state->memory[--cpu_state->sp] = (ret_addr & 0x00FF);
+
+                cpu_state->pc = 0x0030;
+                break;
+            }
+            // LD, SP+imm8
+            case 0xF8:
+            {
+                u16 sp = cpu_state->sp;
+                u16 imm8 = cpu_state->memory[cpu_state->pc+1];
+
+                set_HL(sp + imm8);
+
+                f_register_set_z(false);
+                f_register_set_n(false);
+                f_register_set_h(((sp & 0xFFF) + (imm8 & 0xFFF)) > 0xFFF);
+                f_register_set_c((sp + imm8) > 0xFFFF);
+
+                cpu_state->pc += 2;
+                break;
+            }
+            // LD SP, HL
+            case 0xF9:
+            {
+                cpu_state->sp = get_HL();
+
+                cpu_state->pc += 1;
+                break;
+            }
+            // LD A, [imm16]
+            case 0xFA:
+            {
+                u16 lo = (u16)cpu_state->memory[cpu_state->pc+1];
+                u16 hi = (u16)cpu_state->memory[cpu_state->pc+2] << 8;
+                u16 address = hi | lo;
+
+                cpu_state->registers.a = cpu_state->memory[address];
+
+                cpu_state->pc += 3;
+                break;
+            }
+            // TODO: EI
+            case 0xFB:
+            {
+                cpu_state->pc += 1;
+                break;
+            }
+            // CP imm8
+            case 0xFE:
+            {
+                u8 imm8 = cpu_state->memory[cpu_state->pc+1];
+
+                f_register_set_z((cpu_state->registers.a - imm8) == 0);
+                f_register_set_n(true);
+                f_register_set_h(((cpu_state->registers.a+imm8) & 0x0F) < (imm8 & 0x0F));
+                f_register_set_c(cpu_state->registers.a < 0xFF);
+
+                cpu_state->pc += 2;
+                break;
+            }
+            // RST 38H
+            case 0xFF:
+            {
+                u16 ret_addr = cpu_state->pc + 1;
+                cpu_state->memory[--cpu_state->sp] = (ret_addr & 0xFF00) >> 8;
+                cpu_state->memory[--cpu_state->sp] = (ret_addr & 0x00FF);
+
+                cpu_state->pc = 0x0038;
+                break;
+            }
+
+
 
             default:
                 cpu_state->pc += 1;
@@ -1256,4 +1850,10 @@ static void set_HL(u16 value)
 {
     cpu_state->registers.h = (u8)((value & 0xFF00) >> 8); // hi
     cpu_state->registers.l = (u8)(value & 0xFF); // lo
+}
+
+
+static void process_16_bit_opcodes(u8 low)
+{
+
 }
