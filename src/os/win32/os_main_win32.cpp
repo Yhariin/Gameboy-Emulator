@@ -338,7 +338,7 @@ b8 os_write_file(OS_FileHandle file, void *data, u64 size)
     b8 success = WriteFile(file, data, size, &bytes_written, nullptr);
     ASSERT(success, "Failed to write to file");
 
-    success = bytes_written == size;
+    success = (bytes_written == size);
     return success;
 }
 
@@ -431,11 +431,19 @@ void os_export_core_library(OS_DLL library)
     f.os_window_close = os_window_close;
     f.os_event_to_string = os_event_to_string;
 
+    f.string_format = string_format;
+    f.string_cat = string_cat;
+
     f.os_file_size = os_file_size;
     f.os_open_file = os_open_file;
     f.os_close_file = os_close_file;
     f.os_read_file = os_read_file;
     f.os_write_file = os_write_file;
+
+    f.os_time_now_micro = os_time_now_micro;
+    f.os_time_now_milli = os_time_now_milli;
+    f.os_time_now_sec = os_time_now_sec;
+    f.os_sleep_milli = os_sleep_milli;
 
     load_core_library_in_dll(&f);
 }
@@ -473,6 +481,11 @@ f64 os_time_now_milli()
 f64 os_time_now_sec()
 {
     return os_time_now_micro() / 1'000'000.0;
+}
+
+void os_sleep_milli(f64 milliseconds)
+{
+    Sleep((DWORD)milliseconds);
 }
 
 OS_W32_Window *os_w32_get_window_from_id(OS_WindowID window_id)
@@ -735,7 +748,7 @@ static LRESULT CALLBACK os_win32_message_callback(HWND hwnd, UINT message, WPARA
             if (character >= 32 && character != 127)
             {
                 OS_Event *event = os_w32_push_event(OS_EventType_KeyTyped, window);
-                if (lparam & bit29)
+                if (lparam & bit28)
                 {
                     event->modifiers |= OS_Modifier_Alt;
                 }
@@ -958,6 +971,7 @@ static ApplicationCode os_w32_load_app_code(String dll_name, String dll_load_nam
     if (result.app_dll)
     {
         result.update_and_render = (f_application_update_and_render *)os_load_dll_function(result.app_dll, string_lit("application_update_and_render"));
+        result.application_shutdown = (f_application_shutdown *)os_load_dll_function(result.app_dll, string_lit("application_shutdown"));
     }
     ASSERT(result.update_and_render != nullptr);
 
@@ -982,6 +996,9 @@ int main(int argc, char **argv)
     os_w32_event_arena()[0] = arena_init(MEGABYTES(1), KILOBYTES(1));
     os_w32_event_arena()[1] = arena_init(MEGABYTES(1), KILOBYTES(1));
     global_os_w32_state().arena = arena_init(MEGABYTES(1), KILOBYTES(1));
+
+    // Set minimum sleep granularity to 1 millisecond;
+    timeBeginPeriod(1);
 
     // Setup service thread that will handle window creation to prevent blocking messages on win32 windows
     service_state().service_startup_unfinished = false;
@@ -1025,8 +1042,7 @@ int main(int argc, char **argv)
 
 
     ApplicationState application_state = {};
-    application_state.arena = arena_init(MEGABYTES(1), KILOBYTES(128));
-
+    application_state.arena = arena_init(MEGABYTES(128), KILOBYTES(128));
 
     // Main loop
     global_os_state().running = true;
@@ -1040,9 +1056,12 @@ int main(int argc, char **argv)
     f64 last_frame_time = os_time_now_milli();
     while(global_os_state().running)
     {
-        f64 time = os_time_now_milli();
-        f64 dt = time - last_frame_time;
-        last_frame_time = time;
+        f64 frame_start = os_time_now_milli();
+        f64 dt = frame_start - last_frame_time;
+        last_frame_time = frame_start;
+
+        application_state.dt = dt;
+        application_state.frame_start = frame_start;
         // LOG_DEBUG("ms: %f, %f\n", dt, 1000.f/(dt));
 
         OS_FileTime new_dll_write_time = os_get_file_last_write_time(app_dll_name);
@@ -1076,6 +1095,8 @@ int main(int argc, char **argv)
 
         os_clear_event_queue();
     }
+    application_code.application_shutdown();
 
+    timeEndPeriod(1);
     return 0;
 }

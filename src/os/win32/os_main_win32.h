@@ -2,9 +2,11 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#include <timeapi.h>
 #pragma comment (lib, "user32")
 #pragma comment (lib, "gdi32")
 #pragma comment (lib, "Synchronization.lib")
+#pragma comment (lib, "Winmm.lib")
 #define SLEEP(x) Sleep(x)
 
 struct OS_W32_Window
@@ -87,6 +89,7 @@ struct ApplicationCode
     OS_DLL app_dll;
     OS_FileTime last_write_time;
     f_application_update_and_render *update_and_render;
+    f_application_shutdown *application_shutdown;
 };
 //
 

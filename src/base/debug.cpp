@@ -45,7 +45,7 @@ void _debug_log(LogColor log_color, const char *format, ...)
     memcpy(&final_format[prefix_size], format, format_size);
     final_format[final_format_length - 1] = 0;
 
-    String str = string_format(scratch.arena, (char *)final_format, args);
+    String str = string_format_stub(scratch.arena, (char *)final_format, args);
     printf("%s", c_string(scratch.arena, str));
 
     temp_arena_end(scratch);

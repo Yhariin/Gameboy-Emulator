@@ -325,9 +325,10 @@ Rect os_get_window_client_rect(OS_WindowID window_id);
 Rect os_get_window_full_rect(OS_WindowID window_id);
 
 // Timing
-f64 os_time_now_micro();
-f64 os_time_now_milli();
-f64 os_time_now_sec();
+CORE_EXPORT(f64 os_time_now_micro());
+CORE_EXPORT(f64 os_time_now_milli());
+CORE_EXPORT(f64 os_time_now_sec());
+CORE_EXPORT(void os_sleep_milli(f64 milliseconds));
 // TODO: Local Date & Time
 
 // Globals

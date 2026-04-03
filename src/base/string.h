@@ -18,7 +18,7 @@ struct String16
 #define STB_SPRINTF_STATIC
 #include "vendor/stb/stb_sprintf.h"
 
-String string_cat(Arena *arena, String a, String b);
+CORE_EXPORT(String string_cat(Arena *arena, String a, String b));
 const char *c_string(Arena *arena, String str);
 const c16 *c_string(Arena *arena, String16 str);
 u64 c_strlen(const c8 *str);
@@ -26,8 +26,8 @@ String c_string_to_String(Arena *arena, const c8 *string, u64 size);
 b8 operator==(String a, String b);
 b8 operator==(String16 a, String16 b);
 
-String string_format(Arena *arena, const char *fmt, ...);
-String string_format(Arena *arena, const char *format, va_list args);
+CORE_EXPORT(String string_format(Arena *arena, const char *fmt, ...));
+String string_format_stub(Arena *arena, const char *format, va_list args);
 
 String16 utf8_to_utf16(Arena *arena, String str8);
 String utf16_to_utf8(Arena *arena, String16 str16);

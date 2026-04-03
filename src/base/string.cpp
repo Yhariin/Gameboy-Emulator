@@ -90,13 +90,13 @@ String string_format(Arena *arena, const char *format, ...)
     va_list args;
     va_start(args, format);
 
-    String result = string_format(arena, format, args);
+    String result = string_format_stub(arena, format, args);
 
     va_end(args);
     return result;
 }
 
-String string_format(Arena *arena, const char *format, va_list args)
+String string_format_stub(Arena *arena, const char *format, va_list args)
 {
     String result = {};
 
@@ -244,7 +244,7 @@ u32 encode_utf8(Arena *arena, c32 codepoint, c8 *character)
     {
         // 2 bytes: 110x xxxx 10xx xxxx
         character[0] = (0b11 << 6) | ((codepoint >> 6) & bitmask5);
-        character[1] = bit8 | (codepoint & bitmask6);
+        character[1] = bit7 | (codepoint & bitmask6);
 
         increment = 2;
     }
@@ -252,8 +252,8 @@ u32 encode_utf8(Arena *arena, c32 codepoint, c8 *character)
     {
         // 3 bytes: 1110 xxxx 10xx xxxx 10xx xxxx
         character[0] = (0b111 << 5) | ((codepoint >> 12) & bitmask4);
-        character[1] = bit8 | ((codepoint >> 6 ) & bitmask6);
-        character[2] = bit8 | (codepoint & bitmask6);
+        character[1] = bit7 | ((codepoint >> 6 ) & bitmask6);
+        character[2] = bit7 | (codepoint & bitmask6);
 
         increment = 3;
     }
@@ -261,9 +261,9 @@ u32 encode_utf8(Arena *arena, c32 codepoint, c8 *character)
     {
         // 4 bytes: 1111 0xxx 10xx xxxx 10xx xxxx 10xx xxxx
         character[0] = (0b1111 << 4) | ((codepoint >> 18) & bitmask3);
-        character[1] = bit8 | ((codepoint >> 12) & bitmask6);
-        character[2] = bit8 | ((codepoint >> 6) & bitmask6);
-        character[3] = bit8 | (codepoint & bitmask6);
+        character[1] = bit7 | ((codepoint >> 12) & bitmask6);
+        character[2] = bit7 | ((codepoint >> 6) & bitmask6);
+        character[3] = bit7 | (codepoint & bitmask6);
 
         increment = 4;
     }
