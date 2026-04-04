@@ -433,6 +433,8 @@ void os_export_core_library(OS_DLL library)
 
     f.string_format = string_format;
     f.string_cat = string_cat;
+    f.c_strlen = c_strlen;
+    f.c_string_to_String = c_string_to_String;
 
     f.os_file_size = os_file_size;
     f.os_open_file = os_open_file;

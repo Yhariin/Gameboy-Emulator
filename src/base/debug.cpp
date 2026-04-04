@@ -33,8 +33,8 @@ void _debug_log(LogColor log_color, const char *format, ...)
 
     TempArena scratch = temp_arena_begin(get_scratch_arena());
 
-    u64 prefix_size = c_strlen(prefix);
-    u64 format_size = c_strlen(format);
+    u64 prefix_size = c_strlen((c8 *)prefix);
+    u64 format_size = c_strlen((c8 *)format);
 
     c8 *final_format;
     u64 final_format_length;

@@ -94,6 +94,8 @@ enum Hardware_Registers
 #define SRAM_END    0xBFFF
 #define WRAM_START  0xC000 // Work RAM, general-purpose RAM for the game to store things in
 #define WRAM_END    0xDFFF
+#define ECHO_START  0xE000 // Echo RAM, use of this area is prohibited
+#define ECHO_END    0xFDFF
 #define OAM_START   0xFE00 // Object Attribute Memory, where "objects" are stored
 #define OAM_END     0xFE9F
 #define IO_START    0xFF00 // Where you control the console
@@ -101,9 +103,6 @@ enum Hardware_Registers
 #define HRAM_START  0xFF80 // High RAM, a tiny bit of general-purpose RAM with faster access
 #define HRAM_END    0xFFFE
 #define IE          0xFFFF // A lone I/O byte that's separated from the rest for some reason
-
-// TODO: Implement proper write behavior depending on vblank status
-#define DISABLE_WRITE_ON_DRAW 1
 
 // z - Zero flag
 // n - Subtraction flag (BCD)
@@ -145,6 +144,7 @@ struct CPU_State
     b8 is_halted;
     b8 halt_bug;
     u8 *memory;
+    Cart_State *rom;
     Timer timer;
 };
 

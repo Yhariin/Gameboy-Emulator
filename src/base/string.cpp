@@ -28,7 +28,7 @@ const c16 *c_string(Arena *arena, String16 str)
 }
 
 // NOTE: Does not include null terminator
-u64 c_strlen(const char *str)
+u64 c_strlen(const c8 *str)
 {
     u64 size = 0;
 

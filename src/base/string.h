@@ -21,8 +21,8 @@ struct String16
 CORE_EXPORT(String string_cat(Arena *arena, String a, String b));
 const char *c_string(Arena *arena, String str);
 const c16 *c_string(Arena *arena, String16 str);
-u64 c_strlen(const c8 *str);
-String c_string_to_String(Arena *arena, const c8 *string, u64 size);
+CORE_EXPORT(u64 c_strlen(const c8 *str));
+CORE_EXPORT(String c_string_to_String(Arena *arena, const c8 *string, u64 size));
 b8 operator==(String a, String b);
 b8 operator==(String16 a, String16 b);
 

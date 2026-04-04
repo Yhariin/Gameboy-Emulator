@@ -1,4 +1,4 @@
-static void cpu_init(Arena *arena, Rom rom)
+static void cpu_init(Arena *arena)
 {
     cpu_state = (CPU_State *)arena_alloc_align(arena, sizeof(CPU_State), sizeof(CPU_State));
     cpu_state->memory = (u8 *)arena_alloc_align(arena, 0xFFFF, sizeof(u8));
@@ -8,8 +8,8 @@ static void cpu_init(Arena *arena, Rom rom)
     cpu_state->timer.div_counter = 0;
     cpu_state->timer.tima_counter = 0;
 
-    ASSERT(rom.size <= 0x8000, "ERROR Rom size must be at most 32kb!");
-    memcpy(cpu_state->memory, rom.data, rom.size);
+    // ASSERT(rom->size <= 0x8000, "ERROR Cart size must be at most 32kb!");
+    memcpy(cpu_state->memory, cart_state->data, cart_state->size);
 
 }
 
@@ -60,7 +60,7 @@ static void cpu_post_boot_init()
     cpu_state->memory[Hardware_Registers_STAT]      = 0x85;
     cpu_state->memory[Hardware_Registers_SCY]       = 0x00;
     cpu_state->memory[Hardware_Registers_SCX]       = 0x00;
-    cpu_state->memory[Hardware_Registers_LY]        = 0x90;
+    cpu_state->memory[Hardware_Registers_LY]        = 0x00;
     cpu_state->memory[Hardware_Registers_LYC]       = 0x00;
     cpu_state->memory[Hardware_Registers_DMA]       = 0xFF;
     cpu_state->memory[Hardware_Registers_BGP]       = 0xFC;
@@ -68,6 +68,7 @@ static void cpu_post_boot_init()
     cpu_state->memory[Hardware_Registers_WX]        = 0x00;
     cpu_state->memory[Hardware_Registers_IE]        = 0x00;
 
+#ifdef WRITE_LOG
     TempArena scratch = temp_arena_begin(get_scratch_arena());
 
     String current_state_log = string_format(scratch.arena, "A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%04X PC:%04X PCMEM:%02X,%02X,%02X,%02X\n",
@@ -78,11 +79,90 @@ static void cpu_post_boot_init()
     os_write_file(out_file, current_state_log.chars, current_state_log.size);
 
     temp_arena_end(scratch);
+#endif
 }
 
+// Return number of cycles spent during the step
+static u8 cpu_step()
+{
+    u8 cycles = 0;
+    cycles += cpu_process_interrupts();
+    if (cpu_state->is_halted)
+    {
+        return 4;
+    }
+    else
+    {
+        u8 instr = fetch_instr();
+        cycles += execute_instr(instr);
+
+        #ifdef WRITE_LOG
+            TempArena scratch = temp_arena_begin(get_scratch_arena());
+
+            String current_state_log = string_format(scratch.arena, "A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%04X PC:%04X PCMEM:%02X,%02X,%02X,%02X\n",
+            cpu_state->registers.a, cpu_state->registers.f, cpu_state->registers.b, cpu_state->registers.c, cpu_state->registers.d,
+            cpu_state->registers.e, cpu_state->registers.h, cpu_state->registers.l, cpu_state->sp, cpu_state->pc,
+            cpu_state->memory[cpu_state->pc], cpu_state->memory[cpu_state->pc+1], cpu_state->memory[cpu_state->pc+2], cpu_state->memory[cpu_state->pc+3]);
+
+            os_write_file(out_file, current_state_log.chars, current_state_log.size);
+
+            temp_arena_end(scratch);
+        #endif
+    }
+
+    return cycles;
+}
+
+// TODO: Finish rest of memory reads
 static u8 mem_read(u16 address)
 {
-    return cpu_state->memory[address];
+    if (address <= ROM_END)
+    {
+        // ROM DATA
+        return cart_read(address);
+    }
+    else if (address <= VRAM_END)
+    {
+        // VRAM
+        // return ppu_vram_read();
+        return cpu_state->memory[address];
+    }
+    else if (address <= SRAM_END)
+    {
+        // Cartridge RAM
+        return cart_read(address);
+    }
+    else if (address <= WRAM_END)
+    {
+        // WRAM
+        return cpu_state->memory[address];
+    }
+    else if (address <= ECHO_END)
+    {
+        // Unusuable echo RAM
+        return 0;
+    }
+    else if (address <= OAM_END)
+    {
+        // OAM
+        // return ppu_oam_read();
+        return cpu_state->memory[address];
+    }
+    else if (address < IO_START)
+    {
+        // Unusuable RAM
+        return 0;
+    }
+    else if (address <= IO_END)
+    {
+        // IO
+        // return io_read();
+        return cpu_state->memory[address];
+    }
+    else
+    {
+        return cpu_state->memory[address];
+    }
 }
 
 static u8 *mem_read_ref(u16 address)
@@ -90,11 +170,58 @@ static u8 *mem_read_ref(u16 address)
     return &(cpu_state->memory[address]);
 }
 
-static void mem_write(u16 address, u8 value)
+// TODO: Finish rest of memory writes;
+static void mem_write(u16 address, u8 data)
 {
-    cpu_state->memory[address] = value;
-}
+    cpu_state->memory[address] = data;
 
+    if (address <= ROM_END)
+    {
+        // ROM DATA
+        cart_write(address, data);
+        // return cpu_state->memory[address];
+    }
+    else if (address <= VRAM_END)
+    {
+        // VRAM
+        //  ppu_vram_read();
+        cpu_state->memory[address] = data;
+    }
+    else if (address <= SRAM_END)
+    {
+        // Cartridge RAM
+        cart_write(address, data);
+    }
+    else if (address <= WRAM_END)
+    {
+        // WRAM
+        cpu_state->memory[address] = data;
+    }
+    else if (address <= ECHO_END)
+    {
+        // Unusuable echo RAM
+    }
+    else if (address <= OAM_END)
+    {
+        // OAM
+        // return ppu_oam_read();
+        cpu_state->memory[address] = data;
+    }
+    else if (address < IO_START)
+    {
+        // Unusuable RAM
+    }
+    else if (address <= IO_END)
+    {
+        // IO
+        // return io_read();
+        cpu_state->memory[address] = data;
+    }
+    else
+    {
+        cpu_state->memory[address] = data;
+    }
+}
 
 static u8 fetch_instr()
 {
@@ -113,8 +240,6 @@ static u8 fetch_instr()
 }
 
 // Returns the number of clock cycles (T-cycles) taken during the insruction processing
-// TODO: Replace all memory read/writes with the appropriate function
-// TODO: Decrement pc counter updates by one
 static u8 execute_instr(u8 instr)
 {
     switch(instr)
@@ -138,13 +263,6 @@ static u8 execute_instr(u8 instr)
         case 0x02:
         {
             u16 address = get_BC();
-
-            #if !DISABLE_WRITE_ON_DRAW
-            if ((address < WRAM_START || address > WRAM_END) && (address < HRAM_START || address > HRAM_END))
-            {
-                return 8;
-            }
-            #endif
 
             mem_write(address, cpu_state->registers.a);
 
@@ -209,16 +327,6 @@ static u8 execute_instr(u8 instr)
             u16 hi = (u16)mem_read(cpu_state->pc+1) << 8;
             u16 address = hi | lo;
 
-            #if !DISABLE_WRITE_ON_DRAW
-            if ((address < WRAM_START || address > WRAM_END) && (address < HRAM_START || address > HRAM_END))
-            {
-                cpu_state->pc += 2;
-                return 20;
-            }
-            #endif
-
-            // sp[lower address] == lo
-            // sp[higher address] == hi
             u8 sp_lo = cpu_state->sp & 0xFF;
             u8 sp_hi = (cpu_state->sp & 0xFF00) >> 8;
 
@@ -321,13 +429,6 @@ static u8 execute_instr(u8 instr)
         case 0x12:
         {
             u16 address = get_DE();
-
-            #if !DISABLE_WRITE_ON_DRAW
-            if ((address < WRAM_START || address > WRAM_END) && (address < HRAM_START || address > HRAM_END))
-            {
-                return 8;
-            }
-            #endif
 
             mem_write(address, cpu_state->registers.a);
 
@@ -491,12 +592,6 @@ static u8 execute_instr(u8 instr)
         case 0x22:
         {
             u16 address = get_HL();
-            #if !DISABLE_WRITE_ON_DRAW
-            if ((address < WRAM_START || address > WRAM_END) && (address < HRAM_START || address > HRAM_END))
-            {
-                return 8;
-            }
-            #endif
 
             mem_write(address, cpu_state->registers.a);
             set_HL(address + 1);
@@ -702,12 +797,7 @@ static u8 execute_instr(u8 instr)
         case 0x32:
         {
             u16 address = get_HL();
-            #if !DISABLE_WRITE_ON_DRAW
-            if ((address < WRAM_START || address > WRAM_END) && (address < HRAM_START || address > HRAM_END))
-            {
-                return 8;
-            }
-            #endif
+
             mem_write(address, cpu_state->registers.a);
             set_HL(address - 1);
 
@@ -1389,7 +1479,6 @@ static u8 execute_instr(u8 instr)
             u16 h = mem_read(cpu_state->sp++);
 
             cpu_state->pc = (l | h << 8);
-            // cpu_state->pc += 1;
 
             return 16;
         }
@@ -1708,13 +1797,6 @@ static u8 execute_instr(u8 instr)
         {
             u16 address = 0xFF00 | cpu_state->registers.c;
 
-            #if !DISABLE_WRITE_ON_DRAW
-            if ((address < WRAM_START || address > WRAM_END) && (address < HRAM_START || address > HRAM_END))
-            {
-                return 8;
-            }
-            #endif
-
             mem_write(address, cpu_state->registers.a);
 
             return 8;
@@ -1779,14 +1861,6 @@ static u8 execute_instr(u8 instr)
             u16 lo = (u16)mem_read(cpu_state->pc);
             u16 hi = (u16)mem_read(cpu_state->pc+1) << 8;
             u16 address = hi | lo;
-
-            #if !DISABLE_WRITE_ON_DRAW
-            if ((address < WRAM_START || address > WRAM_END) && (address < HRAM_START || address > HRAM_END))
-            {
-                cpu_state->pc += 2;
-                return 16;
-            }
-            #endif
 
             mem_write(address, cpu_state->registers.a);
 
@@ -1955,41 +2029,6 @@ static u8 execute_instr(u8 instr)
 
 }
 
-// Return number of cycles spent during the step
-static u8 cpu_step()
-{
-    u8 cycles = 0;
-    cycles += cpu_process_interrupts();
-    if (cpu_state->is_halted)
-    {
-        return 4;
-        // Check if interrupt is pending, if it is then
-        // 1. Wake up CPU
-        // 2. Call interrupt handler
-        // 3. process next instruction
-    }
-    else
-    {
-        u8 instr = fetch_instr();
-        cycles += execute_instr(instr);
-
-        // Log file
-        TempArena scratch = temp_arena_begin(get_scratch_arena());
-
-        String current_state_log = string_format(scratch.arena, "A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%04X PC:%04X PCMEM:%02X,%02X,%02X,%02X\n",
-        cpu_state->registers.a, cpu_state->registers.f, cpu_state->registers.b, cpu_state->registers.c, cpu_state->registers.d,
-        cpu_state->registers.e, cpu_state->registers.h, cpu_state->registers.l, cpu_state->sp, cpu_state->pc,
-        cpu_state->memory[cpu_state->pc], cpu_state->memory[cpu_state->pc+1], cpu_state->memory[cpu_state->pc+2], cpu_state->memory[cpu_state->pc+3]);
-
-        os_write_file(out_file, current_state_log.chars, current_state_log.size);
-
-        temp_arena_end(scratch);
-        //
-    }
-
-
-    return cycles;
-}
 
 static void request_interrupt(InterruptFlags interrupt)
 {
@@ -2108,7 +2147,6 @@ static void set_HL(u16 value)
     cpu_state->registers.h = (u8)((value & 0xFF00) >> 8); // hi
     cpu_state->registers.l = (u8)(value & 0xFF); // lo
 }
-
 
 static u8 process_16_bit_opcodes(u8 low)
 {
@@ -2781,7 +2819,6 @@ static void cpu_update_timer(u8 cycles)
 
 }
 
-// TODO: Finish this. Implement cycles, the rest of the interrupt handlers, and the halt bug
 static u8 cpu_process_interrupts()
 {
     u8 interrupt_flag = cpu_state->memory[Hardware_Registers_IF];
@@ -2878,6 +2915,7 @@ static u8 cpu_process_interrupts()
     return 0;
 }
 
+// Helper function for blargg tests
 static void print_tests()
 {
     if (cpu_state->memory[Hardware_Registers_SC] == 0x81)

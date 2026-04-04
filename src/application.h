@@ -14,6 +14,8 @@ typedef String f_os_event_to_string(Arena *arena, const OS_Event *const event);
 
 typedef String f_string_format(Arena *arena, const char *fmt, ...);
 typedef String f_string_cat(Arena *arena, String a, String b);
+typedef u64 f_c_strlen(const c8 *str);
+typedef String f_c_string_to_String(Arena *arena, const c8 *string, u64 size);
 
 typedef u64 f_os_file_size(OS_FileHandle file);
 typedef OS_FileHandle f_os_open_file(OS_FileAccessFlag flags, String path);
@@ -38,6 +40,8 @@ struct LibraryFunctions
 
     f_string_format *string_format;
     f_string_cat *string_cat;
+    f_c_strlen *c_strlen;
+    f_c_string_to_String *c_string_to_String;
 
     f_os_file_size *os_file_size;
     f_os_open_file *os_open_file;
