@@ -173,8 +173,6 @@ static u8 *mem_read_ref(u16 address)
 // TODO: Finish rest of memory writes;
 static void mem_write(u16 address, u8 data)
 {
-    cpu_state->memory[address] = data;
-
     if (address <= ROM_END)
     {
         // ROM DATA

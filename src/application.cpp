@@ -26,6 +26,8 @@ static f_os_time_now_milli *os_time_now_milli;
 static f_os_time_now_sec *os_time_now_sec;
 static f_os_sleep_milli *os_sleep_milli;
 
+// #define WRITE_LOG 1
+
 #include "emulator/cart.h"
 #include "emulator/cpu.h"
 
@@ -65,7 +67,7 @@ static void application_initialize(ApplicationState *application_state)
 
 
     // Cart *rom = load_cart(state->arena, string_lit("../roms/hello-world.gb"));
-    // load_cart(string_lit("../roms/test_roms/03-op sp,hl.gb");
+    // load_cart(state->arena, string_lit("../roms/test_roms/instr_test.gb"));
     load_cart(state->arena, string_lit("../roms/test_roms/01-special.gb"));
     // Cart rom = load_cart(state->arena, string_lit("../roms/test_roms/02-interrupts.gb"));
     // Cart rom = load_cart(state->arena, string_lit("../roms/test_roms/03-op sp,hl.gb"));
@@ -79,15 +81,15 @@ static void application_initialize(ApplicationState *application_state)
     // Cart rom = load_cart(state->arena, string_lit("../roms/test_roms/11-op a,(hl).gb"));
 
     // out_file =  os_open_file(OS_FileAccessFlag_Write, string_lit("07_logfile.txt"));
+    #ifdef WRITE_LOG
+        out_file =  os_open_file(OS_FileAccessFlag_Write, string_lit("01_logfile.txt"));
+    #endif
 
     cpu_init(state->arena);
     cpu_post_boot_init();
 
 
     // out_file =  os_open_file(OS_FileAccessFlag_Write, string_lit("01-special-out.txt"));
-    #ifdef WRITE_LOG
-        out_file =  os_open_file(OS_FileAccessFlag_Write, string_lit("logfile.txt"));
-    #endif
 }
 
 extern "C" DLL_EXPORT void application_update_and_render(ApplicationState *application_state)

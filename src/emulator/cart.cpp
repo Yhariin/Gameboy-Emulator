@@ -158,7 +158,7 @@ static u8 cart_read(u16 address)
 {
     if (cart_state->mbc_type == Cart_MBC_Type_NO_MBC)
     {
-        if (address < 0x4000)
+        if (address < 0x8000)
         {
             return cart_state->data[address];
         }
