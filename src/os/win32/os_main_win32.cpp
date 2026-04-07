@@ -1046,6 +1046,37 @@ int main(int argc, char **argv)
     ApplicationState application_state = {};
     application_state.arena = arena_init(MEGABYTES(128), KILOBYTES(128));
 
+    // Render Buffer
+    BITMAPINFO bmi = {};
+    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bmi.bmiHeader.biWidth = 160;
+    bmi.bmiHeader.biHeight = -144;
+    bmi.bmiHeader.biPlanes = 1;
+    bmi.bmiHeader.biBitCount = 32;
+    bmi.bmiHeader.biCompression = BI_RGB;
+
+    u32 frame_buffer[160 * 144];
+
+    // TODO: Add this to window state
+    // TODO: clean this up
+    HDC hdc = GetDC(os_w32_get_window_from_id(main_window)->hwnd);
+    u32 *ppv_bits = nullptr;
+
+    HBITMAP bitmap = CreateDIBSection(hdc, &bmi, DIB_RGB_COLORS, (void **)&ppv_bits, nullptr, 0);
+    for(int i = 0; i < ARRAY_COUNT(frame_buffer); i++)
+    {
+        // frame_buffer[i] = 0x00ff00ff;
+        ppv_bits[i] = 0x00ff00ff;
+        // if (i % 4 == 0)
+        //     frame_buffer[i] = 0;
+        // else
+        //     frame_buffer[i] = 0xFf;
+    }
+    // memcpy(ppv_bits, frame_buffer, sizeof(frame_buffer));
+    HDC hdc_mem = CreateCompatibleDC(hdc);
+    SelectObject(hdc_mem, bitmap);
+
+
     // Main loop
     global_os_state().running = true;
 
@@ -1093,7 +1124,11 @@ int main(int argc, char **argv)
             os_mutex_unlock(itr->mutex);
         }
 
+        // TODO: initialize frame_buffer
         application_code.update_and_render(&application_state);
+
+        StretchBlt(hdc, 0, 0, width, height, hdc_mem, 0, 0, 160, 144, SRCCOPY);
+        // BitBlt(hdc, 0, 0, 160, 144, hdc_mem, 0, 0, SRCCOPY);
 
         os_clear_event_queue();
     }
