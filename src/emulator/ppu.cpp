@@ -25,6 +25,11 @@ static void ppu_init(Arena *arena)
 
 static u8 ppu_oam_read(u16 address)
 {
+    if (ppu_state->lcd_mode == LCD_Mode_2_OAM_SCAN || ppu_state->lcd_mode == LCD_Mode_3_TRANSFER)
+    {
+        return 0xFF;
+    }
+
     u8 *oam_8b = (u8 *)ppu_state->oam_ram;
     return oam_8b[address - OAM_START];
 }
@@ -37,6 +42,11 @@ static void ppu_oam_write(u16 address, u8 data)
 
 static u8 ppu_vram_read(u16 address)
 {
+    if (ppu_state->lcd_mode == LCD_Mode_3_TRANSFER)
+    {
+        return 0xFF;
+    }
+
     return ppu_state->vram[address - VRAM_START];
 }
 
@@ -71,6 +81,7 @@ static void ppu_step(u32 cycles)
         ppu_state->cycles = 0;
         *ppu_state->ly = 0;
         ppu_state->lcd_mode = LCD_Mode_0_HBLANK;
+        return;
     }
 
     ppu_state->cycles += cycles;

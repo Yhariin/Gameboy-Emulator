@@ -74,9 +74,16 @@ static void application_initialize(ApplicationState *application_state)
     // load_cart(state->arena, string_lit("../roms/test_roms/dmg-acid2.gb"));
     // load_cart(state->arena, string_lit("../roms/test_roms/instr_test.gb"));
     load_cart(state->arena, string_lit("../roms/Dr. Mario.gb"));
+    // load_cart(state->arena, string_lit("../roms/Alleyway.gb"));
+    // load_cart(state->arena, string_lit("../roms/Motocross Maniacs.gb"));
+    // load_cart(state->arena, string_lit("../roms/Tennis.gb"));
     // load_cart(state->arena, string_lit("../roms/mooneye/acceptance/oam_dma/basic.gb"));
     // load_cart(state->arena, string_lit("../roms/mooneye/acceptance/if_ie_registers.gb"));
     // load_cart(state->arena, string_lit("../roms/Tetris.gb"));
+    // load_cart(state->arena, string_lit("../roms/test_roms/instr_timing.gb"));
+    // load_cart(state->arena, string_lit("../roms/test_roms/interrupt_time.gb"));
+    // load_cart(state->arena, string_lit("../roms/test_roms/1-lcd_sync.gb"));
+    // load_cart(state->arena, string_lit("../roms/test_roms/halt_bug.gb"));
     // load_cart(state->arena, string_lit("../roms/test_roms/01-special.gb"));
     // load_cart(state->arena, string_lit("../roms/test_roms/02-interrupts.gb"));
     // load_cart(state->arena, string_lit("../roms/test_roms/03-op sp,hl.gb"));

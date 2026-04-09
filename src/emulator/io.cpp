@@ -7,6 +7,11 @@ static u8 io_read(u16 address)
         return 0;
     }
 
+    if (address == Hardware_Registers_DIV)
+    {
+        return cpu_state->memory[Hardware_Registers_DIV] >> 8;
+    }
+
     // if (address >= Hardware_Registers_LCDC && address <= Hardware_Registers_WX)
     // {
     //     // TODO: handle lcd control
@@ -25,6 +30,11 @@ static void io_write(u16 address, u8 data)
         return;
     }
 
+    if (address == Hardware_Registers_DIV)
+    {
+        cpu_state->memory[Hardware_Registers_DIV] = 0;
+    }
+
     // if (address >= Hardware_Registers_LCDC && address <= Hardware_Registers_WX)
     // {
     //     // TODO: handle lcd control
@@ -34,7 +44,6 @@ static void io_write(u16 address, u8 data)
     if (address == Hardware_Registers_DMA)
     {
         dma_start(data);
-        LOG_DEBUG("DMA START\n");
     }
 
     cpu_state->memory[address] = data;

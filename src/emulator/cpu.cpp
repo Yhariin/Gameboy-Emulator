@@ -5,8 +5,10 @@ static void cpu_init(Arena *arena)
     cpu_state->sp = 0xFFFE;
     cpu_state->ime = false;
     cpu_state->is_halted = false;
+    cpu_state->ime_scheduled = false;
     cpu_state->timer.div_counter = 0;
     cpu_state->timer.tima_counter = 0;
+    cpu_state->timer.overflow_pending = false;
 
     // ASSERT(rom->size <= 0x8000, "ERROR Cart size must be at most 32kb!");
     memcpy(cpu_state->memory, cart_state->data, cart_state->size);
@@ -88,29 +90,38 @@ static void cpu_post_boot_init()
 static u8 cpu_step()
 {
     u8 cycles = 0;
-    cycles += cpu_process_interrupts();
+    cycles = cpu_process_interrupts();
+    if (cycles > 0)
+    {
+        return cycles;
+    }
+
     if (cpu_state->is_halted)
     {
         return 4;
     }
-    else
+
+    if (cpu_state->ime_scheduled)
     {
-        u8 instr = fetch_instr();
-        cycles += execute_instr(instr);
-
-        #ifdef WRITE_LOG
-            TempArena scratch = temp_arena_begin(get_scratch_arena());
-
-            String current_state_log = string_format(scratch.arena, "A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%04X PC:%04X PCMEM:%02X,%02X,%02X,%02X\n",
-            cpu_state->registers.a, cpu_state->registers.f, cpu_state->registers.b, cpu_state->registers.c, cpu_state->registers.d,
-            cpu_state->registers.e, cpu_state->registers.h, cpu_state->registers.l, cpu_state->sp, cpu_state->pc,
-            cpu_state->memory[cpu_state->pc], cpu_state->memory[cpu_state->pc+1], cpu_state->memory[cpu_state->pc+2], cpu_state->memory[cpu_state->pc+3]);
-
-            os_write_file(out_file, current_state_log.chars, current_state_log.size);
-
-            temp_arena_end(scratch);
-        #endif
+        cpu_state->ime_scheduled = false;
+        cpu_state->ime = true;
     }
+
+    u8 instr = fetch_instr();
+    cycles += execute_instr(instr);
+
+    #ifdef WRITE_LOG
+        TempArena scratch = temp_arena_begin(get_scratch_arena());
+
+        String current_state_log = string_format(scratch.arena, "A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%04X PC:%04X PCMEM:%02X,%02X,%02X,%02X\n",
+        cpu_state->registers.a, cpu_state->registers.f, cpu_state->registers.b, cpu_state->registers.c, cpu_state->registers.d,
+        cpu_state->registers.e, cpu_state->registers.h, cpu_state->registers.l, cpu_state->sp, cpu_state->pc,
+        cpu_state->memory[cpu_state->pc], cpu_state->memory[cpu_state->pc+1], cpu_state->memory[cpu_state->pc+2], cpu_state->memory[cpu_state->pc+3]);
+
+        os_write_file(out_file, current_state_log.chars, current_state_log.size);
+
+        temp_arena_end(scratch);
+    #endif
 
     return cycles;
 }
@@ -1743,7 +1754,7 @@ static u8 execute_instr(u8 instr)
 
             return cycles;
         }
-        // TODO: RETI
+        // RETI
         case 0xD9:
         {
             cpu_state->ime = true;
@@ -1969,6 +1980,7 @@ static u8 execute_instr(u8 instr)
         case 0xF3:
         {
             cpu_state->ime = false;
+            cpu_state->ime_scheduled = false;
 
             return 4;
         }
@@ -2042,7 +2054,8 @@ static u8 execute_instr(u8 instr)
         // EI
         case 0xFB:
         {
-            cpu_state->ime = true;
+            // cpu_state->ime = true;
+            cpu_state->ime_scheduled = true;
 
             return 4;
         }
@@ -2817,7 +2830,15 @@ static u8 process_16_bit_opcodes(u8 low)
 
 static void cpu_update_timer(u8 cycles)
 {
-    // Update the 0xFF04 divider register
+    // Handle pending TIMA overflow from previous step
+    if (cpu_state->timer.overflow_pending)
+    {
+        cpu_state->timer.overflow_pending = false;
+        cpu_state->memory[Hardware_Registers_TIMA] = cpu_state->memory[Hardware_Registers_TMA];
+        request_interrupt(InterruptFlags_Timer);
+    }
+
+    // Update DIV register every 256 T-cycles
     cpu_state->timer.div_counter += cycles;
     if (cpu_state->timer.div_counter >= DIV_UPDATE_RATE)
     {
@@ -2825,47 +2846,33 @@ static void cpu_update_timer(u8 cycles)
         cpu_state->memory[Hardware_Registers_DIV]++;
     }
 
-    // Update the 0xFF05 TIMA timer counter
+    // Update TIMA — bit 2 of TAC is the enable flag
     u8 tac = cpu_state->memory[Hardware_Registers_TAC];
+    if (!(tac & 0x04))
+        return; // timer disabled
 
-    if (tac & bit2)
+    u16 tima_update_rate;
+    switch (tac & 0x03)
     {
-        cpu_state->timer.tima_counter += cycles;
-
-        u16 tima_update_rate;
-        if ((tac & 0x3) == 0x0)
-        {
-            tima_update_rate = 1024;
-        }
-        else if ((tac & 0x3) == 0x1)
-        {
-            tima_update_rate = 8;
-        }
-        else if ((tac & 0x3) == 0x2)
-        {
-            tima_update_rate = 64;
-        }
-        else
-        {
-            tima_update_rate = 256;
-        }
-
-
-        if (cpu_state->timer.tima_counter >= tima_update_rate)
-        {
-            cpu_state->timer.div_counter -= tima_update_rate;
-            cpu_state->memory[Hardware_Registers_TIMA]++;
-
-            // Check for overflow
-            if (cpu_state->memory[Hardware_Registers_TIMA] == 0)
-            {
-                cpu_state->memory[Hardware_Registers_TIMA] = cpu_state->memory[Hardware_Registers_TMA];
-                request_interrupt(InterruptFlags_Timer);
-            }
-        }
+        case 0x00: tima_update_rate = 1024; break;
+        case 0x01: tima_update_rate = 16;   break;
+        case 0x02: tima_update_rate = 64;   break;
+        case 0x03: tima_update_rate = 256;  break;
     }
 
+    cpu_state->timer.tima_counter += cycles;
 
+    // Use while in case multiple ticks are needed
+    while (cpu_state->timer.tima_counter >= tima_update_rate)
+    {
+        cpu_state->timer.tima_counter -= tima_update_rate;
+        cpu_state->memory[Hardware_Registers_TIMA]++;
+
+        if (cpu_state->memory[Hardware_Registers_TIMA] == 0)
+        {
+            cpu_state->timer.overflow_pending = true;
+        }
+    }
 }
 
 static u8 cpu_process_interrupts()

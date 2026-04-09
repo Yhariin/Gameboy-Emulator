@@ -133,6 +133,7 @@ struct Timer
 {
     u32 div_counter;
     u32 tima_counter;
+    b8 overflow_pending;
 };
 
 struct CPU_State
@@ -143,6 +144,7 @@ struct CPU_State
     b8 ime;
     b8 is_halted;
     b8 halt_bug;
+    b8 ime_scheduled;
     b8 dma_transferring;
     u8 *memory;
     Cart_State *rom;
