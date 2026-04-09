@@ -12,7 +12,7 @@ struct Registers
     u8 l;
 };
 
-enum Hardware_Registers
+enum Hardware_Registers : u16
 {
     Hardware_Registers_P1_JOYP          = 0xFF00,
     Hardware_Registers_SB               = 0xFF01,
@@ -121,7 +121,7 @@ static void f_register_set_c(b8 flag);
 enum InterruptFlags
 {
     InterruptFlags_VBlank = bit0,
-    InterruptFlags_LCD = bit1,
+    InterruptFlags_LCD_STAT = bit1,
     InterruptFlags_Timer = bit2,
     InterruptFlags_Serial = bit3,
     InterruptFlags_Joypad = bit4,
@@ -143,6 +143,7 @@ struct CPU_State
     b8 ime;
     b8 is_halted;
     b8 halt_bug;
+    b8 dma_transferring;
     u8 *memory;
     Cart_State *rom;
     Timer timer;
@@ -171,6 +172,7 @@ static u8 mem_read(u16 address);
 static u8 *mem_read_ref(u16 address);
 static void mem_write(u16 address, u8 value);
 
+
 static void read_boot_rom();
 
 static u8 fetch_instr();
@@ -183,3 +185,16 @@ static u8 cpu_process_interrupts();
 static u8 process_16_bit_opcodes(u8 low);
 
 static void print_tests();
+
+struct DMA_State
+{
+    b8 active;
+    u8 index;
+    u8 source;
+    i32 cycles_remaining;
+};
+
+DMA_State *dma_state = nullptr;
+
+static void dma_start(u8 start);
+static void dma_step(u32 cycles);

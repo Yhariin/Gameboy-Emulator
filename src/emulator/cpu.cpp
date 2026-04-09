@@ -11,6 +11,8 @@ static void cpu_init(Arena *arena)
     // ASSERT(rom->size <= 0x8000, "ERROR Cart size must be at most 32kb!");
     memcpy(cpu_state->memory, cart_state->data, cart_state->size);
 
+    dma_state = (DMA_State *)arena_alloc_align(arena, sizeof(DMA_State), sizeof(DMA_State));
+    dma_state->active = false;
 }
 
 static void cpu_post_boot_init()
@@ -124,8 +126,8 @@ static u8 mem_read(u16 address)
     else if (address <= VRAM_END)
     {
         // VRAM
-        // return ppu_vram_read();
-        return cpu_state->memory[address];
+        return ppu_vram_read(address);
+        // return cpu_state->memory[address];
     }
     else if (address <= SRAM_END)
     {
@@ -134,7 +136,7 @@ static u8 mem_read(u16 address)
     }
     else if (address <= WRAM_END)
     {
-        // WRAM
+        // TODO: WRAM
         return cpu_state->memory[address];
     }
     else if (address <= ECHO_END)
@@ -145,8 +147,13 @@ static u8 mem_read(u16 address)
     else if (address <= OAM_END)
     {
         // OAM
-        // return ppu_oam_read();
-        return cpu_state->memory[address];
+        if (dma_state->active)
+        {
+            return 0;
+        }
+
+        return ppu_oam_read(address);
+        // return cpu_state->memory[address];
     }
     else if (address < IO_START)
     {
@@ -156,8 +163,8 @@ static u8 mem_read(u16 address)
     else if (address <= IO_END)
     {
         // IO
-        // return io_read();
-        return cpu_state->memory[address];
+        return io_read(address);
+        // return cpu_state->memory[address];
     }
     else
     {
@@ -182,8 +189,8 @@ static void mem_write(u16 address, u8 data)
     else if (address <= VRAM_END)
     {
         // VRAM
-        //  ppu_vram_read();
-        cpu_state->memory[address] = data;
+        ppu_vram_write(address, data);
+        // cpu_state->memory[address] = data;
     }
     else if (address <= SRAM_END)
     {
@@ -202,8 +209,8 @@ static void mem_write(u16 address, u8 data)
     else if (address <= OAM_END)
     {
         // OAM
-        // return ppu_oam_read();
-        cpu_state->memory[address] = data;
+        ppu_oam_write(address, data);
+        // cpu_state->memory[address] = data;
     }
     else if (address < IO_START)
     {
@@ -212,13 +219,57 @@ static void mem_write(u16 address, u8 data)
     else if (address <= IO_END)
     {
         // IO
-        // return io_read();
-        cpu_state->memory[address] = data;
+        io_write(address, data);
+        // cpu_state->memory[address] = data;
     }
     else
     {
         cpu_state->memory[address] = data;
     }
+}
+
+static void dma_start(u8 start)
+{
+   dma_state->active = true;
+   dma_state->index = 0;
+   dma_state->cycles_remaining = 640;
+   dma_state->source = start;
+}
+
+static void dma_step(u32 cycles)
+{
+    if (!dma_state->active)
+    {
+        return;
+    }
+
+    u8 iterations_completed = (640 - dma_state->cycles_remaining) / 4;
+    i32 updated_cycles = 640 - (dma_state->cycles_remaining - (i32)cycles);
+    if (updated_cycles < 0)
+    {
+        updated_cycles = 0;
+    }
+    u8 current_iterations = (updated_cycles / 4) - iterations_completed;
+
+    for(i32 i = 0; i < current_iterations; i++)
+    {
+        ppu_oam_write(dma_state->index + OAM_START, mem_read(dma_state->source * 0x100) + dma_state->index);
+        (dma_state->index)++;
+    }
+
+    dma_state->cycles_remaining -= cycles;
+
+    if (dma_state->cycles_remaining <= 0)
+    {
+        dma_state->cycles_remaining = 0;
+    }
+
+    if (dma_state->cycles_remaining <= 0)
+    {
+        // Transfer complete
+        dma_state->active = false;
+    }
+
 }
 
 static u8 fetch_instr()

@@ -30,9 +30,13 @@ static f_os_sleep_milli *os_sleep_milli;
 
 #include "emulator/cart.h"
 #include "emulator/cpu.h"
+#include "emulator/io.h"
+#include "emulator/ppu.h"
 
 #include "emulator/cart.cpp"
 #include "emulator/cpu.cpp"
+#include "emulator/io.cpp"
+#include "emulator/ppu.cpp"
 
 extern "C" DLL_EXPORT void load_core_library(LibraryFunctions *f)
 {
@@ -66,27 +70,33 @@ static void application_initialize(ApplicationState *application_state)
     ApplicationState *state = application_state; // alias
 
 
-    // Cart *rom = load_cart(state->arena, string_lit("../roms/hello-world.gb"));
+    // load_cart(state->arena, string_lit("../roms/hello-world.gb"));
+    // load_cart(state->arena, string_lit("../roms/test_roms/dmg-acid2.gb"));
     // load_cart(state->arena, string_lit("../roms/test_roms/instr_test.gb"));
-    load_cart(state->arena, string_lit("../roms/test_roms/01-special.gb"));
-    // Cart rom = load_cart(state->arena, string_lit("../roms/test_roms/02-interrupts.gb"));
-    // Cart rom = load_cart(state->arena, string_lit("../roms/test_roms/03-op sp,hl.gb"));
-    // Cart rom = load_cart(state->arena, string_lit("../roms/test_roms/04-op r,imm.gb"));
-    // Cart rom = load_cart(state->arena, string_lit("../roms/test_roms/05-op rp.gb"));
-    // Cart rom = load_cart(state->arena, string_lit("../roms/test_roms/06-ld r,r.gb"));
-    // Cart rom = load_cart(state->arena, string_lit("../roms/test_roms/07-jr,jp,call,ret,rst.gb"));
-    // Cart rom = load_cart(state->arena, string_lit("../roms/test_roms/08-misc instrs.gb"));
-    // Cart rom = load_cart(state->arena, string_lit("../roms/test_roms/09-op r,r.gb"));
-    // Cart rom = load_cart(state->arena, string_lit("../roms/test_roms/10-bit ops.gb"));
-    // Cart rom = load_cart(state->arena, string_lit("../roms/test_roms/11-op a,(hl).gb"));
+    load_cart(state->arena, string_lit("../roms/Dr. Mario.gb"));
+    // load_cart(state->arena, string_lit("../roms/mooneye/acceptance/oam_dma/basic.gb"));
+    // load_cart(state->arena, string_lit("../roms/mooneye/acceptance/if_ie_registers.gb"));
+    // load_cart(state->arena, string_lit("../roms/Tetris.gb"));
+    // load_cart(state->arena, string_lit("../roms/test_roms/01-special.gb"));
+    // load_cart(state->arena, string_lit("../roms/test_roms/02-interrupts.gb"));
+    // load_cart(state->arena, string_lit("../roms/test_roms/03-op sp,hl.gb"));
+    // load_cart(state->arena, string_lit("../roms/test_roms/04-op r,imm.gb"));
+    // load_cart(state->arena, string_lit("../roms/test_roms/05-op rp.gb"));
+    // load_cart(state->arena, string_lit("../roms/test_roms/06-ld r,r.gb"));
+    // load_cart(state->arena, string_lit("../roms/test_roms/07-jr,jp,call,ret,rst.gb"));
+    // load_cart(state->arena, string_lit("../roms/test_roms/08-misc instrs.gb"));
+    // load_cart(state->arena, string_lit("../roms/test_roms/09-op r,r.gb"));
+    // load_cart(state->arena, string_lit("../roms/test_roms/10-bit ops.gb"));
+    // load_cart(state->arena, string_lit("../roms/test_roms/11-op a,(hl).gb"));
 
     // out_file =  os_open_file(OS_FileAccessFlag_Write, string_lit("07_logfile.txt"));
     #ifdef WRITE_LOG
-        out_file =  os_open_file(OS_FileAccessFlag_Write, string_lit("01_logfile.txt"));
+        out_file =  os_open_file(OS_FileAccessFlag_Write, string_lit("logfile.txt"));
     #endif
 
     cpu_init(state->arena);
     cpu_post_boot_init();
+    ppu_init(state->arena);
 
 
     // out_file =  os_open_file(OS_FileAccessFlag_Write, string_lit("01-special-out.txt"));
@@ -112,9 +122,51 @@ extern "C" DLL_EXPORT void application_update_and_render(ApplicationState *appli
         cycles_this_frame += cycles;
 
         cpu_update_timer(cycles);
+        ppu_step(cycles);
+        dma_step(cycles);
 
         print_tests();
         itr++;
+    }
+
+    // Update framebuffer
+    {
+        for (int i = 0; i < RES_X * RES_Y; i++)
+        {
+            u32 color; // ARGB
+            switch(ppu_state->frame_buffer[i])
+            {
+                case 0x00:
+                {
+                    color = 0xffffffff;
+                    break;
+                }
+                case 0x01:
+                {
+                    color = 0xffaaaaaa;
+                    break;
+                }
+                case 0x02:
+                {
+                    color = 0xff555555;
+                    break;
+                }
+                case 0x03:
+                {
+                    color = 0xff000000;
+                    break;
+                }
+                default:
+                {
+                    color = 0xffffffff;
+                    break;
+                }
+            }
+            state->frame_buffer[i] = color;
+
+            // if (ppu_state->frame_buffer[i] =)
+            // state->frame_buffer[]
+        }
     }
 
     if (cart_state->need_save)

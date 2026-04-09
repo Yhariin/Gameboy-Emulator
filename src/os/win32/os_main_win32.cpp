@@ -1038,6 +1038,11 @@ int main(int argc, char **argv)
     i32 center_screen_y = GetSystemMetrics(SM_CYSCREEN) / 2 - height / 2;
 
     Rect window_rect = {.x = (f32)center_screen_x, .y = (f32)center_screen_y, .width = (f32)width, .height = (f32)height};
+    RECT rect = {(i32)window_rect.x, (i32)window_rect.y, (i32)(window_rect.width + window_rect.x), (i32)(window_rect.height + window_rect.y)};
+
+    // TODO: Conversion from Rect to RECT
+    AdjustWindowRectEx(&rect, WINDOWED_STYLE, false, 0);
+    window_rect = os_w32_Rect_from_RECT(rect);
 
     // Create main window
     OS_WindowID main_window = os_window_open(window_rect, OS_WindowFlag_None, string_lit("Game Boy Emulator"));
@@ -1060,13 +1065,14 @@ int main(int argc, char **argv)
     // TODO: Add this to window state
     // TODO: clean this up
     HDC hdc = GetDC(os_w32_get_window_from_id(main_window)->hwnd);
-    u32 *ppv_bits = nullptr;
+    u32 *ppv_bits = nullptr; // ARGB
 
     HBITMAP bitmap = CreateDIBSection(hdc, &bmi, DIB_RGB_COLORS, (void **)&ppv_bits, nullptr, 0);
+    application_state.frame_buffer = ppv_bits;
     for(int i = 0; i < ARRAY_COUNT(frame_buffer); i++)
     {
         // frame_buffer[i] = 0x00ff00ff;
-        ppv_bits[i] = 0x00ff00ff;
+        ppv_bits[i] = 0x00ff0000;
         // if (i % 4 == 0)
         //     frame_buffer[i] = 0;
         // else

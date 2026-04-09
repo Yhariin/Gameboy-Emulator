@@ -68,7 +68,7 @@ struct ApplicationState
     OS_Window *first_window;
     OS_Window *last_window;
 
-    void *frame_buffer;
+    u32 *frame_buffer;
 };
 
 typedef void f_load_core_library(LibraryFunctions *f);
