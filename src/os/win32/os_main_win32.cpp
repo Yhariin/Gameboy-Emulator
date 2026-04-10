@@ -1051,6 +1051,9 @@ int main(int argc, char **argv)
     ApplicationState application_state = {};
     application_state.arena = arena_init(MEGABYTES(128), KILOBYTES(128));
 
+    application_state.argc = argc;
+    application_state.argv = (c8 **) argv;
+
     // Render Buffer
     BITMAPINFO bmi = {};
     bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);

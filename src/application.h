@@ -60,6 +60,9 @@ struct ApplicationState
     Arena *arena;
     b8 initialized;
 
+    i32 argc;
+    c8 **argv;
+
     b8 *key_states;
 
     f64 frame_start;

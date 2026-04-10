@@ -69,6 +69,18 @@ static void application_initialize(ApplicationState *application_state)
 {
     ApplicationState *state = application_state; // alias
 
+    if (application_state->argc == 2)
+    {
+        TempArena scratch = temp_arena_begin(get_scratch_arena());
+
+        String rom_dir = c_string_to_String(scratch.arena, application_state->argv[1], c_strlen(application_state->argv[1]) + 1);
+        load_cart(state->arena, rom_dir);
+
+        temp_arena_end(scratch);
+    }
+    else
+    {
+
 
     // load_cart(state->arena, string_lit("../roms/hello-world.gb"));
     // load_cart(state->arena, string_lit("../roms/test_roms/dmg-acid2.gb"));
@@ -95,6 +107,7 @@ static void application_initialize(ApplicationState *application_state)
     // load_cart(state->arena, string_lit("../roms/test_roms/09-op r,r.gb"));
     // load_cart(state->arena, string_lit("../roms/test_roms/10-bit ops.gb"));
     // load_cart(state->arena, string_lit("../roms/test_roms/11-op a,(hl).gb"));
+    }
 
     // out_file =  os_open_file(OS_FileAccessFlag_Write, string_lit("07_logfile.txt"));
     #ifdef WRITE_LOG
